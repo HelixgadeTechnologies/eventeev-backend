@@ -9,7 +9,7 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
 
-// const { AuthRoute } = require("./src/index.routes");
+const { AuthRoute } = require("./index.routes");
 
 
 const mongodb = process.env.MongoUrl;
@@ -25,6 +25,6 @@ app.get("/", (req, res) => {
   res.send("EVENTEEV IS ACTIVE");
 });
 
-// app.use("/auth", AuthRoute);
+app.use("/auth", AuthRoute);
 
 module.exports = app;
