@@ -9,7 +9,7 @@ exports.signup = async (req, res) => {
   try {
     const { firstname, lastname, email, password } = req.body;
 
-    // Check if user exists
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(409).json({ message: "User already exists" });
@@ -18,36 +18,22 @@ exports.signup = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User({
-      firstname,
-      lastname,
-      email,
-      password: hashedPassword,
-      isVerified: false,
-    });
+    // Generate verification token (without saving to DB)
+    const token = jwt.sign(
+      { firstname, lastname, email, password: hashedPassword },
+      process.env.JWT_KEY,
+      { expiresIn: "1h" }
+    );
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_KEY, {
-      expiresIn: "1h",
-    });
-
-    await user.save();
-
+    // Configure Nodemailer
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT,
       secure: process.env.SMTP_PORT == 465,
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS, 
+        pass: process.env.SMTP_PASS,
       },
-    });
-
-    transporter.verify((error, success) => {
-      if (error) {
-        console.error("SMTP Transport Error:", error);
-      } else {
-        console.log("SMTP Server Ready:", success);
-      }
     });
 
     // Email content
@@ -58,7 +44,7 @@ exports.signup = async (req, res) => {
       html: `
         <h2>Hello ${firstname},</h2>
         <p>Please verify your email by clicking the link below:</p>
-        <a href="http://localhost:5000/auth/verify/${token}">Verify Email</a>
+        <a href="https://eventeevapi.onrender.com/auth/verify/${token}">Verify Email</a>
         <p>This link will expire in 1 hour.</p>
       `,
     };
@@ -68,7 +54,7 @@ exports.signup = async (req, res) => {
     res.status(201).json({
       message:
         "Registration successful! Please check your email to verify your account.",
-        token
+      token,
     });
   } catch (error) {
     console.error("Signup Error:", error.message);
@@ -79,6 +65,7 @@ exports.signup = async (req, res) => {
   }
 };
 
+
 // Verify user endpoint
 exports.verifyuser = async (req, res) => {
   try {
@@ -88,30 +75,32 @@ exports.verifyuser = async (req, res) => {
       return res.status(400).json({ message: "Token is required" });
     }
 
-    // Verify the token
+    // Verify the token and extract user data
     const decoded = jwt.verify(token, process.env.JWT_KEY);
-    const user = await User.findById(decoded.userId);
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" });
+    // Check if user already exists (to prevent double registration)
+    const existingUser = await User.findOne({ email: decoded.email });
+    if (existingUser) {
+      return res.status(409).json({ message: "User already verified." });
     }
 
-    // Check if user is already verified
-    if (user.isVerified) {
-      return res.status(400).json({ message: "Account already verified" });
-    }
+    // Create and save user to database
+    const user = new User({
+      firstname: decoded.firstname,
+      lastname: decoded.lastname,
+      email: decoded.email,
+      password: decoded.password,
+      isVerified: true,
+    });
 
-    // Mark user as verified
-    user.isVerified = true;
     await user.save();
 
-    res.json({ message: "Account verified successfully!", user });
+    res.status(200).json({ message: "Account verified successfully! You can now log in." });
   } catch (error) {
-    res
-      .status(400)
-      .json({ message: "Invalid or expired token", error: error.message });
+    res.status(400).json({ message: "Invalid or expired token", error: error.message });
   }
 };
+
 
 // organisation details
 exports.organisationdetails = async (req, res) => {
@@ -195,7 +184,7 @@ exports.forgotpassword = async (req, res) => {
     });
 
     // Create a password reset link
-    const resetLink = `http://localhost:5000/auth/reset-password/${resetToken}`;
+    const resetLink = `https://eventeevapi.onrender.com/auth/reset-password/${resetToken}`;
 
     // Send email with reset link
     const transporter = nodemailer.createTransport({
