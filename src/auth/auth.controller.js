@@ -81,7 +81,7 @@ exports.verifyuser = async (req, res) => {
     // Check if user already exists (to prevent double registration)
     const existingUser = await User.findOne({ email: decoded.email });
     if (existingUser) {
-      return res.status(409).json({ message: "User already verified." });
+      return res.status(409).json({ message: "Verified." });
     }
 
     // Create and save user to database
