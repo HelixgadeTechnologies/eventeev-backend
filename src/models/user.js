@@ -33,10 +33,10 @@ const UserSchema = new mongoose.Schema(
       type: String,
     },
     organisationWebsite: {
-      type: String
+      type: String,
     },
     organisationIndustry: {
-      type: String
+      type: String,
     },
     isVerified: {
       type: Boolean,
