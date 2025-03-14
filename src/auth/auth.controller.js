@@ -95,7 +95,7 @@ exports.verifyuser = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: "Account verified successfully! You can now log in." });
+    res.status(200).json({ message: "Account verified successfully! You can now log in.",userId: user._id });
   } catch (error) {
     res.status(400).json({ message: "Invalid or expired token", error: error.message });
   }
