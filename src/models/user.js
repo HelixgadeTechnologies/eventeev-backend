@@ -29,6 +29,9 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    timezone:{
+      type:String
+    },
     organisationName: {
       type: String,
     },
@@ -37,6 +40,9 @@ const UserSchema = new mongoose.Schema(
     },
     organisationIndustry: {
       type: String,
+    },
+    organisationszie:{
+      type: String
     },
     isVerified: {
       type: Boolean,

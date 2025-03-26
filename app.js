@@ -9,7 +9,7 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
 
-const { AuthRoute, EventRoute, TicketRoute } = require("./index.routes");
+const { AuthRoute, EventRoute, TicketRoute, UserRoute } = require("./index.routes");
 
 
 const mongodb = process.env.MongoUrl;
@@ -28,5 +28,6 @@ app.get("/", (req, res) => {
 app.use("/auth", AuthRoute);
 app.use("/event", EventRoute)
 app.use("/ticket",TicketRoute)
+app.use("/user", UserRoute)
 
 module.exports = app;
