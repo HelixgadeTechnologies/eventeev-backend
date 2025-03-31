@@ -5,7 +5,9 @@ const {
   draftevent,
   getpublishedevents,
   getdraftedevents,
-  getcompletedevents
+  getcompletedevents,
+  editevent,
+  deleteEvent
 } = require("../event/event.controller");
 const authMiddleware = require("../middleware/auth");
 
@@ -26,6 +28,17 @@ router.post(
 );
 router.get("/published", authMiddleware, getpublishedevents);
 router.get("/drafts", authMiddleware, getdraftedevents);
-router.get("/completed", authMiddleware, getcompletedevents)
+router.get("/completed", authMiddleware, getcompletedevents);
+router.put(
+  "/editevent/:id",
+  authMiddleware,
+  upload.single("thumbnail"),
+  editevent
+);
+router.delete(
+  "/deleteevent/:id",
+  authMiddleware,
+  deleteEvent
+);
 
 module.exports = router;
