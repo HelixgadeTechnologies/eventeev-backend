@@ -3,6 +3,7 @@ const upload = require("../../config/multer");
 const {
   publishevent,
   draftevent,
+  publishDraftedEvent,
   getpublishedevents,
   getdraftedevents,
   getcompletedevents,
@@ -26,6 +27,7 @@ router.post(
   upload.single("thumbnail"),
   draftevent
 );
+router.post("/drafttolive/:id", authMiddleware, publishDraftedEvent);
 router.get("/published", authMiddleware, getpublishedevents);
 router.get("/drafts", authMiddleware, getdraftedevents);
 router.get("/completed", authMiddleware, getcompletedevents);

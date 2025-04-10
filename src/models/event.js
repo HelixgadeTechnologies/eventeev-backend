@@ -38,7 +38,7 @@ const eventSchema = new mongoose.Schema(
     twitter: { type: String },
     status: {
       type: String,
-      enum: ["published", "draft"],
+      enum: ["published", "draft", "completed"],
     },
   },
   { timestamps: true }
