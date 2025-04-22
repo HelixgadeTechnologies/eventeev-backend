@@ -23,7 +23,7 @@ module.exports = (req, res, next) => {
     jwt.verify(token, process.env.JWT_KEY, (err, user) => {
       if (err) {
         console.error("JWT Verification Error:", err.message);
-        return res.status(403).json({ message: "INVALID TOKEN" });
+        return res.status(403).json({ message: "TOKEN HAS EXPIRED" });
       }
 
       console.log("Decoded Token:", user);

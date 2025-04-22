@@ -1,28 +1,12 @@
 const Event = require("../models/event");
-const cloudinary = require("cloudinary").v2;
-
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true,
-});
-
-// Helper function to upload image to Cloudinary
-const uploadThumbnail = async (file) => {
-  const b64 = Buffer.from(file.buffer).toString("base64");
-  const dataURI = `data:${file.mimetype};base64,${b64}`;
-
-  const result = await cloudinary.uploader.upload(dataURI, {
-    folder: "events/thumbnails",
-  });
-
-  return result.secure_url;
-};
 
 // ========== Publish a New Event ==========
 exports.publishevent = async (req, res) => {
   try {
+
+    const userId = req.user?.userId;
+    if (!userId) return res.status(400).json({ message: "User ID is missing." });
+
     const {
       name,
       description,
@@ -33,19 +17,13 @@ exports.publishevent = async (req, res) => {
       type,
       location,
       category,
+      thumbnail,
       website,
       facebook,
       instagram,
       twitter,
     } = req.body;
 
-    const userId = req.user?.userId;
-    if (!userId) return res.status(400).json({ message: "User ID is missing." });
-
-    let thumbnailUrl = "";
-    if (req.file) {
-      thumbnailUrl = await uploadThumbnail(req.file);
-    }
 
     const newEvent = new Event({
       userId,
@@ -55,7 +33,7 @@ exports.publishevent = async (req, res) => {
       endDate,
       startTime,
       endTime,
-      thumbnail: thumbnailUrl,
+      thumbnail,
       type,
       location,
       category,
@@ -78,6 +56,9 @@ exports.publishevent = async (req, res) => {
 // ========== Draft an Event ==========
 exports.draftevent = async (req, res) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(400).json({ message: "User ID is missing." });
+
     const {
       name,
       description,
@@ -87,20 +68,13 @@ exports.draftevent = async (req, res) => {
       endTime,
       type,
       location,
+      thumbnail,
       category,
       website,
       facebook,
       instagram,
       twitter,
     } = req.body;
-
-    const userId = req.user?.userId;
-    if (!userId) return res.status(400).json({ message: "User ID is missing." });
-
-    let thumbnailUrl = "";
-    if (req.file) {
-      thumbnailUrl = await uploadThumbnail(req.file);
-    }
 
     const draftedEvent = new Event({
       userId,
@@ -110,7 +84,7 @@ exports.draftevent = async (req, res) => {
       endDate,
       startTime,
       endTime,
-      thumbnail: thumbnailUrl,
+      thumbnail,
       type,
       location,
       category,
@@ -157,7 +131,6 @@ exports.getdraftedevents = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 // ========== Get Completed Events (and Auto-Update Status) ==========
 exports.getcompletedevents = async (req, res) => {
   try {
@@ -166,15 +139,22 @@ exports.getcompletedevents = async (req, res) => {
 
     const currentDate = new Date();
 
-    const expiredEvents = await Event.find({
+    // Fetch events that are NOT yet marked completed
+    const eventsToCheck = await Event.find({
       userId,
-      endDate: { $lt: currentDate },
       status: { $ne: "completed" },
     });
 
-    // Update expired events to completed
+    // Filter only the events where (endDate + 1 day) has passed
+    const expiredEvents = eventsToCheck.filter(event => {
+      const nextDay = new Date(event.endDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      return nextDay <= currentDate;
+    });
+
+    // Update those expired events to "completed"
     await Promise.all(
-      expiredEvents.map((event) => {
+      expiredEvents.map(event => {
         event.status = "completed";
         return event.save();
       })
@@ -188,6 +168,7 @@ exports.getcompletedevents = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 // ========== Move Draft to Live ==========
 exports.publishDraftedEvent = async (req, res) => {
