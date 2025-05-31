@@ -195,17 +195,54 @@ exports.publishDraftedEvent = async (req, res) => {
 exports.editevent = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const {
+      name,
+      description,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      type,
+      location,
+      thumbnail,
+      category,
+      website,
+      facebook,
+      instagram,
+      twitter,
+    } = req.body;
+    
+    console.log(req.body);
+
+    const updates = {
+      name,
+      description,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      type,
+      location,
+      thumbnail,
+      category,
+      website,
+      facebook,
+      instagram,
+      twitter,
+    };
+
     const userId = req.user?.userId;
     if (!userId) return res.status(400).json({ message: "User ID is missing." });
 
-    if (req.file) {
-      const thumbnailUrl = await uploadThumbnail(req.file);
-      updates.thumbnail = thumbnailUrl;
-    }
+    const updatedEvent = await Event.findOneAndUpdate(
+      { _id: id, userId },
+      updates,
+      { new: true }
+    );
 
-    const updatedEvent = await Event.findOneAndUpdate({ _id: id, userId }, updates, { new: true });
-    if (!updatedEvent) return res.status(404).json({ message: "Event not found or unauthorized" });
+    if (!updatedEvent) {
+      return res.status(404).json({ message: "Event not found or unauthorized" });
+    }
 
     res.status(200).json({ message: "Event updated successfully", updatedEvent });
   } catch (error) {
@@ -213,6 +250,7 @@ exports.editevent = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 // ========== Delete Event ==========
 exports.deleteEvent = async (req, res) => {
