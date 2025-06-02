@@ -5,11 +5,9 @@ exports.updateuser = async (req, res) => {
     const userId = req.user?.userId;
 
     if (!userId) {
-      return res
-        .status(400)
-        .json({ message: "User ID is missing or invalid." });
+      return res.status(400).json({ message: "User ID is missing or invalid." });
     }
-    const { id } = req.params;
+
     const {
       firstname,
       lastname,
@@ -22,18 +20,21 @@ exports.updateuser = async (req, res) => {
       organisationIndustry,
     } = req.body;
 
-    // Find user by ID and update
-    const updatedUser = await User.findByIdAndUpdate(id, {
-      firstname,
-      lastname,
-      email,
-      phoneNumber,
-      gender,
-      country,
-      organisationName,
-      organisationWebsite,
-      organisationIndustry,
-    });
+    const updatedUser = await User.findByIdAndUpdate(
+      userId, // use userId if only allowing self-update
+      {
+        firstname,
+        lastname,
+        email,
+        phoneNumber,
+        gender,
+        country,
+        organisationName,
+        organisationWebsite,
+        organisationIndustry,
+      },
+      { new: true, runValidators: true }
+    );
 
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
@@ -41,7 +42,7 @@ exports.updateuser = async (req, res) => {
 
     res.status(200).json({
       message: "User details updated successfully",
-      updatedUser
+      updatedUser,
     });
   } catch (error) {
     res.status(500).json({
@@ -50,3 +51,5 @@ exports.updateuser = async (req, res) => {
     });
   }
 };
+
+
