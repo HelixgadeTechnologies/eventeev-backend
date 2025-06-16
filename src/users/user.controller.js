@@ -1,9 +1,9 @@
 const User = require("../models/user");
-const OpenAI = require("openai");
+// const OpenAI = require("openai");
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAIKEY,
-});
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAIKEY,
+// });
 
 exports.updateuser = async (req, res) => {
   try {
