@@ -5,5 +5,7 @@ const router = express.Router();
 
 
 router.put("/updateuser/:id", authMiddleware, updateuser)
+// router.post("/testingopenai", testingopenai)
+// router.post("/caching", apicaching)
 
 module.exports = router;
