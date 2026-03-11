@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const chatController = require('../controllers/chatController');
+const auth = require('../middleware/auth');
 
 // @route   POST /api/chat/room
-router.post('/room', chatController.createRoom);
+router.post('/room', auth, chatController.createRoom);
 
 // @route   GET /api/chat/rooms/:eventId
 router.get('/rooms/:eventId', chatController.getRooms);

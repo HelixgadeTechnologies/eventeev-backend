@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const checklistController = require('../controllers/checklistController');
+const auth = require('../middleware/auth');
 
 // @route   GET /api/checklist/event/:eventId
 router.get('/event/:eventId', checklistController.getEventChecklist);
 
-// @route   POST /api/checklist
-router.post('/', checklistController.addChecklistItem);
+// @route   POST api/checklist
+router.post('/', auth, checklistController.createChecklistItem);
 
-// @route   PATCH /api/checklist/:id
-router.patch('/:id', checklistController.editChecklistItem);
+// @route   POST api/checklist/bulk
+router.post('/bulk', auth, checklistController.createBulkItems);
 
-// @route   DELETE /api/checklist/:id
-router.delete('/:id', checklistController.deleteChecklistItem);
+// @route   PATCH api/checklist/:id
+router.patch('/:id', auth, checklistController.updateChecklistItem);
 
-// @route   POST /api/checklist/bulk
-router.post('/bulk', checklistController.createChecklistBulk);
+// @route   DELETE api/checklist/:id
+router.delete('/:id', auth, checklistController.deleteChecklistItem);
 
 module.exports = router;

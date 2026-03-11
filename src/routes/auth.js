@@ -54,11 +54,13 @@ router.get('/verify/:token', authController.verifyEmail);
  */
 router.post('/resetpassword/:token', authController.resetPassword);
 
+const auth = require('../middleware/auth');
+
 /**
  * @route   PUT api/auth/organisation
  * @desc    Update organisation
  * @access  Private
  */
-router.put('/organisation', authController.updateOrganisation);
+router.put('/organisation', auth, authController.updateOrganisation);
 
 module.exports = router;
