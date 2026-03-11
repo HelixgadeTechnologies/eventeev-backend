@@ -4,9 +4,28 @@ const { check } = require('express-validator');
 const authController = require('../controllers/authController');
 
 /**
- * @route   POST api/auth/register
- * @desc    Register user
- * @access  Public
+ * @openapi
+ * /api/auth/register:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Register a new user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [firstName, lastName, email, password]
+ *             properties:
+ *               firstName: { type: string }
+ *               lastName: { type: string }
+ *               email: { type: string }
+ *               password: { type: string }
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *       400:
+ *         description: Bad request
  */
 router.post(
   '/register',
@@ -20,9 +39,26 @@ router.post(
 );
 
 /**
- * @route   POST api/auth/login
- * @desc    Login user
- * @access  Public
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Login user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email: { type: string }
+ *               password: { type: string }
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
  */
 router.post(
   '/login',
@@ -34,32 +70,90 @@ router.post(
 );
 
 /**
- * @route   POST api/auth/forgotpassword
- * @desc    Forgot password
- * @access  Public
+ * @openapi
+ * /api/auth/forgotpassword:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Forgot password
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string }
+ *     responses:
+ *       200:
+ *         description: Reset link sent
  */
 router.post('/forgotpassword', authController.forgotPassword);
 
 /**
- * @route   GET api/auth/verify/:token
- * @desc    Verify email
- * @access  Public
+ * @openapi
+ * /api/auth/verify/{token}:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Verify email
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Email verified
  */
 router.get('/verify/:token', authController.verifyEmail);
 
 /**
- * @route   POST api/auth/resetpassword/:token
- * @desc    Reset password
- * @access  Public
+ * @openapi
+ * /api/auth/resetpassword/{token}:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Reset password
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               password: { type: string }
+ *     responses:
+ *       200:
+ *         description: Password reset successful
  */
 router.post('/resetpassword/:token', authController.resetPassword);
 
 const auth = require('../middleware/auth');
 
 /**
- * @route   PUT api/auth/organisation
- * @desc    Update organisation
- * @access  Private
+ * @openapi
+ * /api/auth/organisation:
+ *   put:
+ *     tags: [Auth]
+ *     summary: Update organisation
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               organizationName: { type: string }
+ *               organizationDescription: { type: string }
+ *     responses:
+ *       200:
+ *         description: Organisation updated
  */
 router.put('/organisation', auth, authController.updateOrganisation);
 
