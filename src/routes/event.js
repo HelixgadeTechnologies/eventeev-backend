@@ -12,6 +12,12 @@ const auth = require('../middleware/auth');
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
  */
 router.get('/published', eventController.getPublishedEvents);
 
@@ -26,6 +32,12 @@ router.get('/published', eventController.getPublishedEvents);
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
  */
 router.get('/drafts', auth, eventController.getDrafts);
 
@@ -40,6 +52,12 @@ router.get('/drafts', auth, eventController.getDrafts);
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
  */
 router.get('/completed', auth, eventController.getCompletedEvents);
 
@@ -56,11 +74,7 @@ router.get('/completed', auth, eventController.getCompletedEvents);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [title, description]
- *             properties:
- *               title: { type: string }
- *               description: { type: string }
+ *             $ref: '#/components/schemas/Event'
  *     responses:
  *       201:
  *         description: Event created

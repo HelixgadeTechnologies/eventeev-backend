@@ -17,6 +17,12 @@ const auth = require('../middleware/auth');
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Link'
  */
 router.get('/event/:eventId', linkController.getEventLinks);
 
@@ -33,15 +39,7 @@ router.get('/event/:eventId', linkController.getEventLinks);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [event, title, url, type]
- *             properties:
- *               event: { type: string }
- *               title: { type: string }
- *               url: { type: string }
- *               type: { type: string, enum: [document, video, link] }
- *               description: { type: string }
- *               uploader: { type: string }
+ *             $ref: '#/components/schemas/Link'
  *     responses:
  *       201:
  *         description: Link created
@@ -65,10 +63,7 @@ router.post('/', auth, linkController.createLink);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               title: { type: string }
- *               url: { type: string }
+ *             $ref: '#/components/schemas/Link'
  *     responses:
  *       200:
  *         description: Success

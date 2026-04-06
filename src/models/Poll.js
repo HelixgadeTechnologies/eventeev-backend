@@ -1,5 +1,46 @@
 const mongoose = require('mongoose');
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Poll:
+ *       type: object
+ *       required:
+ *         - eventId
+ *         - title
+ *       properties:
+ *         id:
+ *           type: string
+ *         eventId:
+ *           type: string
+ *         title:
+ *           type: string
+ *         category:
+ *           type: string
+ *           enum: [Pre-Event, Live Poll, Post-Event]
+ *         status:
+ *           type: string
+ *           enum: [LIVE, ENDED]
+ *         questions:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               text: { type: string }
+ *               options:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     text: { type: string }
+ *                     votesCount: { type: number }
+ *         totalResponses:
+ *           type: number
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ */
 const PollSchema = new mongoose.Schema({
   eventId: {
     type: mongoose.Schema.Types.ObjectId,

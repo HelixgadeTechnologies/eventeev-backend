@@ -17,6 +17,12 @@ const auth = require('../middleware/auth');
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Checklist'
  */
 router.get('/event/:eventId', checklistController.getEventChecklist);
 
@@ -33,13 +39,7 @@ router.get('/event/:eventId', checklistController.getEventChecklist);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [event, title, category]
- *             properties:
- *               event: { type: string }
- *               title: { type: string }
- *               category: { type: string }
- *               description: { type: string }
+ *             $ref: '#/components/schemas/Checklist'
  *     responses:
  *       201:
  *         description: Checklist item created
@@ -89,9 +89,7 @@ router.post('/bulk', auth, checklistController.createBulkItems);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               status: { type: string, enum: [Done, Incomplete] }
+ *             $ref: '#/components/schemas/Checklist'
  *     responses:
  *       200:
  *         description: Success

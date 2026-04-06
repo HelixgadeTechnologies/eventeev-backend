@@ -1,5 +1,56 @@
 const mongoose = require('mongoose');
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Ticket:
+ *       type: object
+ *       required:
+ *         - eventId
+ *         - name
+ *         - type
+ *         - quantity
+ *       properties:
+ *         id:
+ *           type: string
+ *         eventId:
+ *           type: string
+ *         name:
+ *           type: string
+ *         type:
+ *           type: string
+ *           enum: [Free, Paid, Donation]
+ *         price:
+ *           type: number
+ *         suggestedAmount:
+ *           type: number
+ *         quantity:
+ *           type: number
+ *         startDate:
+ *           type: string
+ *           format: date
+ *         startTime:
+ *           type: string
+ *         endDate:
+ *           type: string
+ *           format: date
+ *         endTime:
+ *           type: string
+ *         description:
+ *           type: string
+ *         status:
+ *           type: string
+ *           enum: [Active, Inactive, Sold Out]
+ *       example:
+ *         id: 60d21b4667d0d8992e610c8c
+ *         eventId: 60d21b4667d0d8992e610c8a
+ *         name: Early Bird Ticket
+ *         type: Paid
+ *         price: 50.00
+ *         quantity: 100
+ *         status: Active
+ */
 const TicketSchema = new mongoose.Schema({
   eventId: {
     type: mongoose.Schema.Types.ObjectId,

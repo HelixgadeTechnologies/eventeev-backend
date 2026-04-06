@@ -14,13 +14,7 @@ const authController = require('../controllers/authController');
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [firstName, lastName, email, password]
- *             properties:
- *               firstName: { type: string }
- *               lastName: { type: string }
- *               email: { type: string }
- *               password: { type: string }
+ *             $ref: '#/components/schemas/User'
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -168,12 +162,7 @@ router.put('/organisation', auth, authController.updateOrganisation);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [firstName, lastName, email]
- *             properties:
- *               firstName: { type: string }
- *               lastName: { type: string }
- *               email: { type: string }
+ *             $ref: '#/components/schemas/User'
  *     responses:
  *       201:
  *         description: Successfully joined the waitlist

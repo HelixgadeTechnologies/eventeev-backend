@@ -1,6 +1,46 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - firstName
+ *         - lastName
+ *         - email
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: The auto-generated id of the user
+ *         firstName:
+ *           type: string
+ *         lastName:
+ *           type: string
+ *         email:
+ *           type: string
+ *           format: email
+ *         isWaitlisted:
+ *           type: boolean
+ *         organizationName:
+ *           type: string
+ *         organizationDescription:
+ *           type: string
+ *         avatar:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *       example:
+ *         id: 60d21b4667d0d8992e610c85
+ *         firstName: John
+ *         lastName: Doe
+ *         email: john.doe@example.com
+ *         isWaitlisted: false
+ *         organizationName: Eventeev
+ */
 const UserSchema = new mongoose.Schema({
   firstName: {
     type: String,

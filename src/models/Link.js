@@ -1,5 +1,29 @@
 const mongoose = require('mongoose');
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Link:
+ *       type: object
+ *       required:
+ *         - eventId
+ *         - title
+ *         - url
+ *       properties:
+ *         id:
+ *           type: string
+ *         eventId:
+ *           type: string
+ *         title:
+ *           type: string
+ *         url:
+ *           type: string
+ *           format: uri
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ */
 const LinkSchema = new mongoose.Schema({
   event: {
     type: mongoose.Schema.Types.ObjectId,

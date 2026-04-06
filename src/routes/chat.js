@@ -16,12 +16,7 @@ const auth = require('../middleware/auth');
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [event, name]
- *             properties:
- *               event: { type: string }
- *               name: { type: string }
- *               type: { type: string, enum: [public, private] }
+ *             $ref: '#/components/schemas/Room'
  *     responses:
  *       201:
  *         description: Room created
@@ -42,6 +37,12 @@ router.post('/room', auth, chatController.createRoom);
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Room'
  */
 router.get('/rooms/:eventId', chatController.getRooms);
 
@@ -59,6 +60,12 @@ router.get('/rooms/:eventId', chatController.getRooms);
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Message'
  */
 router.get('/messages/:roomId', chatController.getMessages);
 

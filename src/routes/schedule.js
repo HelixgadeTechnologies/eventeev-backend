@@ -16,15 +16,7 @@ const auth = require('../middleware/auth');
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [event, title, startTime, endTime]
- *             properties:
- *               event: { type: string }
- *               title: { type: string }
- *               startTime: { type: string, format: date-time }
- *               endTime: { type: string, format: date-time }
- *               description: { type: string }
- *               speakers: { type: array, items: { type: string } }
+ *             $ref: '#/components/schemas/Schedule'
  *     responses:
  *       201:
  *         description: Schedule item created
@@ -45,6 +37,12 @@ router.post('/', auth, scheduleController.createScheduleItem);
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Schedule'
  */
 router.get('/event/:eventId', scheduleController.getEventSchedule);
 

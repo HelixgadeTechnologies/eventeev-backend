@@ -1,5 +1,31 @@
 const mongoose = require('mongoose');
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     Vote:
+ *       type: object
+ *       required:
+ *         - userId
+ *         - pollId
+ *         - questionId
+ *         - optionId
+ *       properties:
+ *         id:
+ *           type: string
+ *         userId:
+ *           type: string
+ *         pollId:
+ *           type: string
+ *         questionId:
+ *           type: string
+ *         optionId:
+ *           type: string
+ *         votedAt:
+ *           type: string
+ *           format: date-time
+ */
 const VoteSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
