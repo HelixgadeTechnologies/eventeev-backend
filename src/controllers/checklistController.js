@@ -20,7 +20,7 @@ exports.getEventChecklist = async (req, res) => {
  * @route   POST /api/checklist
  * @access  Private
  */
-exports.addChecklistItem = async (req, res) => {
+exports.createChecklistItem = async (req, res) => {
   const { event, title, description, category, status } = req.body;
   try {
     const checklistItem = new Checklist({
@@ -43,7 +43,7 @@ exports.addChecklistItem = async (req, res) => {
  * @route   PATCH /api/checklist/:id
  * @access  Private
  */
-exports.editChecklistItem = async (req, res) => {
+exports.updateChecklistItem = async (req, res) => {
   const { title, description, category, status } = req.body;
   try {
     let checklistItem = await Checklist.findById(req.params.id);
@@ -88,7 +88,7 @@ exports.deleteChecklistItem = async (req, res) => {
  * @route   POST /api/checklist/bulk
  * @access  Private
  */
-exports.createChecklistBulk = async (req, res) => {
+exports.createBulkItems = async (req, res) => {
   const { eventId, items } = req.body;
   try {
     const checklistItems = items.map(item => ({

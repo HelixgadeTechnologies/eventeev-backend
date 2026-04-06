@@ -193,3 +193,53 @@ exports.updateOrganisation = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Join Waitlist
+ * @route   POST /api/auth/waitlist
+ * @access  Public
+ */
+exports.waitlist = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { firstName, lastName, email } = req.body;
+
+  try {
+    let user = await User.findOne({ email });
+
+    if (user) {
+      if (user.isWaitlisted) {
+        return res.status(400).json({ message: 'You are already on the waitlist!' });
+      } else {
+        return res.status(400).json({ message: 'This email is already registered as a full account.' });
+      }
+    }
+
+    // Create a waitlisted user record
+    user = new User({
+      firstName,
+      lastName,
+      email,
+      isWaitlisted: true
+    });
+
+    await user.save();
+
+    res.status(201).json({
+      message: 'Successfully joined the waitlist!',
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email
+      }
+    });
+
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};

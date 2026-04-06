@@ -5,7 +5,7 @@ const Schedule = require('../models/Schedule');
  * @route   POST /api/schedule
  * @access  Private
  */
-exports.createSchedule = async (req, res) => {
+exports.createScheduleItem = async (req, res) => {
   const { event, startTime, endTime, title, type, description, speakers } = req.body;
   try {
     const scheduleItem = new Schedule({

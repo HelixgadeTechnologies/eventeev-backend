@@ -157,4 +157,37 @@ const auth = require('../middleware/auth');
  */
 router.put('/organisation', auth, authController.updateOrganisation);
 
+/**
+ * @openapi
+ * /api/auth/waitlist:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Join waitlist
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [firstName, lastName, email]
+ *             properties:
+ *               firstName: { type: string }
+ *               lastName: { type: string }
+ *               email: { type: string }
+ *     responses:
+ *       201:
+ *         description: Successfully joined the waitlist
+ *       400:
+ *         description: Already on waitlist or invalid data
+ */
+router.post(
+  '/waitlist',
+  [
+    check('firstName', 'First name is required').not().isEmpty(),
+    check('lastName', 'Last name is required').not().isEmpty(),
+    check('email', 'Please include a valid email').isEmail()
+  ],
+  authController.waitlist
+);
+
 module.exports = router;
