@@ -143,8 +143,9 @@ const auth = require('../middleware/auth');
  *           schema:
  *             type: object
  *             properties:
- *               organizationName: { type: string }
- *               organizationDescription: { type: string }
+ *               orgName: { type: string }
+ *               orgWebsite: { type: string }
+ *               orgIndustry: { type: string }
  *     responses:
  *       200:
  *         description: Organisation updated

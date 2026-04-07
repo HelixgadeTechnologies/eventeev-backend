@@ -22,11 +22,17 @@ const bcrypt = require('bcryptjs');
  *         email:
  *           type: string
  *           format: email
+ *         password:
+ *           type: string
+ *           format: password
+ *           minLength: 6
  *         isWaitlisted:
  *           type: boolean
- *         organizationName:
+ *         orgName:
  *           type: string
- *         organizationDescription:
+ *         orgWebsite:
+ *           type: string
+ *         orgIndustry:
  *           type: string
  *         avatar:
  *           type: string
@@ -38,8 +44,11 @@ const bcrypt = require('bcryptjs');
  *         firstName: John
  *         lastName: Doe
  *         email: john.doe@example.com
+ *         password: password123
  *         isWaitlisted: false
- *         organizationName: Eventeev
+ *         orgName: Eventeev
+ *         orgWebsite: https://eventeev.com
+ *         orgIndustry: Technology
  */
 const UserSchema = new mongoose.Schema({
   firstName: {
@@ -72,10 +81,13 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  organizationName: {
+  orgName: {
     type: String,
   },
-  organizationDescription: {
+  orgWebsite: {
+    type: String,
+  },
+  orgIndustry: {
     type: String,
   },
   avatar: {

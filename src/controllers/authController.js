@@ -185,11 +185,30 @@ exports.verifyEmail = async (req, res) => {
  * @access  Private
  */
 exports.updateOrganisation = async (req, res) => {
-  const { organizationName, organizationDescription } = req.body;
+  const { orgName, orgWebsite, orgIndustry } = req.body;
   try {
-    // In a real app, find user by id from req.user and update
-    res.json({ message: 'Organisation updated successful' });
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.orgName = orgName || user.orgName;
+    user.orgWebsite = orgWebsite || user.orgWebsite;
+    user.orgIndustry = orgIndustry || user.orgIndustry;
+
+    await user.save();
+
+    res.json({ 
+      message: 'Organisation updated successful',
+      user: {
+        id: user.id,
+        orgName: user.orgName,
+        orgWebsite: user.orgWebsite,
+        orgIndustry: user.orgIndustry
+      }
+    });
   } catch (error) {
+    console.error(error.message);
     res.status(500).send('Server Error');
   }
 };
