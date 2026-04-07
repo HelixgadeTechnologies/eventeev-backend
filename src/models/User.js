@@ -11,6 +11,7 @@ const bcrypt = require('bcryptjs');
  *         - firstName
  *         - lastName
  *         - email
+ *         - password
  *       properties:
  *         id:
  *           type: string

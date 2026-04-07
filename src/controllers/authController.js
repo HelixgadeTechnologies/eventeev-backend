@@ -15,7 +15,7 @@ exports.register = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { firstName, lastName, email, password } = req.body;
+  const { firstName, lastName, email, password, orgName, orgWebsite, orgIndustry } = req.body;
 
   try {
     // 2. Check if user already exists
@@ -29,7 +29,10 @@ exports.register = async (req, res) => {
       firstName,
       lastName,
       email,
-      password
+      password,
+      orgName,
+      orgWebsite,
+      orgIndustry
     });
 
     await user.save();
