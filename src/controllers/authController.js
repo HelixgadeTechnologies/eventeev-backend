@@ -94,6 +94,11 @@ exports.login = async (req, res) => {
     }
 
     // 3. Verify password
+    if (!user.password) {
+      console.warn(`[Login] Login attempt for user ${email} failed: No password set (possibly waitlisted user).`);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -112,7 +117,10 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN },
       (err, token) => {
-        if (err) throw err;
+        if (err) {
+          console.error('[Login] JWT signing error:', err);
+          return res.status(500).send('Server Error');
+        }
         
         // 5. Successful Response
         res.json({
@@ -129,7 +137,7 @@ exports.login = async (req, res) => {
     );
 
   } catch (error) {
-    console.error(error.message);
+    console.error('[Login] Unexpected Server Error:', error);
     res.status(500).send('Server Error');
   }
 };
