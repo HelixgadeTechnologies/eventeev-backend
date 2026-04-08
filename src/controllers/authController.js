@@ -45,12 +45,20 @@ exports.register = async (req, res) => {
       }
     };
 
+    if (!process.env.JWT_SECRET) {
+      console.error('[Registration] CRITICAL: JWT_SECRET environment variable is missing.');
+      return res.status(500).send('Server Error: Authentication configuration missing');
+    }
+
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN },
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
       (err, token) => {
-        if (err) throw err;
+        if (err) {
+          console.error('[Registration] JWT signing error:', err);
+          return res.status(500).send('Server Error');
+        }
         
         // 5. Successful Response
         res.status(201).json({
@@ -112,10 +120,15 @@ exports.login = async (req, res) => {
       }
     };
 
+    if (!process.env.JWT_SECRET) {
+      console.error('[Login] CRITICAL: JWT_SECRET environment variable is missing.');
+      return res.status(500).send('Server Error: Authentication configuration missing');
+    }
+
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN },
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
       (err, token) => {
         if (err) {
           console.error('[Login] JWT signing error:', err);

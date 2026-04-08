@@ -8,6 +8,17 @@ const Message = require('./models/Message');
 // Connect Database
 connectDB();
 
+// Validate critical environment variables
+const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'JWT_EXPIRES_IN'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('[CRITICAL] Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('[CRITICAL] Authentication and Database features may fail!');
+} else {
+  console.log('[SUCCESS] All required environment variables are present.');
+}
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
