@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { check } = require('express-validator');
 const eventController = require('../controllers/eventController');
 const auth = require('../middleware/auth');
 
@@ -79,7 +80,20 @@ router.get('/completed', auth, eventController.getCompletedEvents);
  *       201:
  *         description: Event created
  */
-router.post('/publish', auth, eventController.publishEvent);
+router.post(
+  '/publish', 
+  auth, 
+  [
+    check('title', 'Title is required').not().isEmpty(),
+    check('description', 'Description is required').not().isEmpty(),
+    check('category', 'Category is required').not().isEmpty(),
+    check('type', 'Type must be Online or Physical').isIn(['Online', 'Physical']),
+    check('date', 'Please include a valid date').isISO8601(),
+    check('time', 'Time is required').not().isEmpty(),
+    check('location', 'Location is required').not().isEmpty()
+  ],
+  eventController.publishEvent
+);
 
 /**
  * @openapi

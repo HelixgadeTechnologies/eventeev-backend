@@ -1,3 +1,4 @@
+const { validationResult } = require('express-validator');
 const Event = require('../models/Event');
 
 /**
@@ -48,10 +49,17 @@ exports.getCompletedEvents = async (req, res) => {
  * @access  Private
  */
 exports.publishEvent = async (req, res) => {
-  const { title, description, category, type, date, time, location, bannerImage } = req.body;
+  // 1. Validate request body
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { title, description, category, type, date, time, location, bannerImage, status } = req.body;
+
   try {
     const event = new Event({
-      owner: '65f123456789012345678901', // Mock user id
+      owner: req.user.id,
       title,
       description,
       category,
@@ -60,11 +68,13 @@ exports.publishEvent = async (req, res) => {
       time,
       location,
       bannerImage,
-      status: 'Published'
+      status: status || 'Published'
     });
+    
     await event.save();
     res.status(201).json(event);
   } catch (error) {
+    console.error('[Publish Event] Error:', error);
     res.status(500).send('Server Error');
   }
 };
