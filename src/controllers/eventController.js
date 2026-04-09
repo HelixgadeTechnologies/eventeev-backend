@@ -16,6 +16,49 @@ exports.getPublishedEvents = async (req, res) => {
 };
 
 /**
+ * @desc    Get event listing for landing page (Upcoming published events)
+ * @route   GET /api/event/listing
+ * @access  Public
+ */
+exports.getEventListing = async (req, res) => {
+  try {
+    const { category, duration } = req.query;
+    const now = new Date();
+    
+    // Base query: Only published and upcoming events
+    const query = { 
+      status: 'Published', 
+      date: { $gte: now } 
+    };
+
+    // Filter by category if provided
+    if (category) {
+      query.category = category;
+    }
+
+    // Filter by duration if provided
+    if (duration === 'week') {
+      const endOfWeek = new Date(now);
+      // Get the end of the current week (Sunday)
+      const diff = 7 - (now.getDay() === 0 ? 7 : now.getDay());
+      endOfWeek.setDate(now.getDate() + diff);
+      endOfWeek.setHours(23, 59, 59, 999);
+      query.date.$lte = endOfWeek;
+    } else if (duration === 'month') {
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+      query.date.$lte = endOfMonth;
+    }
+
+    const events = await Event.find(query).sort({ date: 1 });
+    res.json(events);
+  } catch (error) {
+    console.error('[Get Event Listing] Error:', error);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
  * @desc    Get drafts
  * @route   GET /api/event/drafts
  * @access  Private

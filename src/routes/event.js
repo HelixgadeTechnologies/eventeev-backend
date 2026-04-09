@@ -6,6 +6,36 @@ const auth = require('../middleware/auth');
 
 /**
  * @openapi
+ * /api/event/listing:
+ *   get:
+ *     tags: [Events]
+ *     summary: Get upcoming published events for landing page
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter events by category
+ *       - in: query
+ *         name: duration
+ *         schema:
+ *           type: string
+ *           enum: [week, month]
+ *         description: Filter events by duration (current week or current month)
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
+ */
+router.get('/listing', eventController.getEventListing);
+
+/**
+ * @openapi
  * /api/event/published:
  *   get:
  *     tags: [Events]
