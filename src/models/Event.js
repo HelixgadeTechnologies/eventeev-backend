@@ -88,6 +88,7 @@ const EventSchema = new mongoose.Schema({
   },
   endDate: {
     type: Date,
+    required: [true, 'Please add an end date'],
   },
   startTime: {
     type: String,

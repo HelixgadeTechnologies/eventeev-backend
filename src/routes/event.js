@@ -124,6 +124,7 @@ router.post(
     check('category', 'Category is required').not().isEmpty(),
     check('type', 'Type must be virtual, hybrid, or in person').isIn(['virtual', 'hybrid', 'in person']),
     check('startDate', 'Please include a valid start date').isISO8601(),
+    check('endDate', 'Please include a valid end date').isISO8601(),
     check('startTime', 'Start time is required').not().isEmpty(),
     check('location', 'Location is required').not().isEmpty()
   ],

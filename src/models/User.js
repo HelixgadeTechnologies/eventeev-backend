@@ -91,6 +91,18 @@ const UserSchema = new mongoose.Schema({
   orgIndustry: {
     type: String,
   },
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'I rather not say'],
+  },
+  tZone: {
+    type: String,
+    default: 'Africa/Lagos',
+  },
+  country: {
+    type: String,
+    default: 'Nigeria',
+  },
   avatar: {
     type: String,
   },

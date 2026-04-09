@@ -20,10 +20,26 @@ exports.getMe = async (req, res) => {
  * @access  Private
  */
 exports.updateUser = async (req, res) => {
+  const { firstName, lastName, gender, tZone, country, avatar } = req.body;
   try {
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select('-password');
-    res.json(user);
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Update fields if they exist in request body
+    user.firstName = firstName || user.firstName;
+    user.lastName = lastName || user.lastName;
+    user.gender = gender || user.gender;
+    user.tZone = tZone || user.tZone;
+    user.country = country || user.country;
+    user.avatar = avatar || user.avatar;
+
+    await user.save();
+    
+    // Return updated user without password
+    const updatedUser = await User.findById(user._id).select('-password');
+    res.json(updatedUser);
   } catch (error) {
+    console.error('[Update User] Error:', error.message);
     res.status(500).send('Server Error');
   }
 };

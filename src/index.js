@@ -4,9 +4,13 @@ const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const app = require('./app');
 const Message = require('./models/Message');
+const startEventStatusTask = require('./tasks/statusTask');
 
 // Connect Database
 connectDB();
+
+// Start Background Tasks
+startEventStatusTask();
 
 // Validate critical environment variables
 const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'JWT_EXPIRES_IN'];
