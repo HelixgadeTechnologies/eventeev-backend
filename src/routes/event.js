@@ -106,9 +106,14 @@ router.get('/completed', auth, eventController.getCompletedEvents);
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/Event'
+ *             description: The event details. Set status to 'Draft' to save without publishing immediately.
  *     responses:
  *       201:
- *         description: Event created
+ *         description: Event created/published successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Event'
  */
 router.post(
   '/publish', 
@@ -117,9 +122,9 @@ router.post(
     check('title', 'Title is required').not().isEmpty(),
     check('description', 'Description is required').not().isEmpty(),
     check('category', 'Category is required').not().isEmpty(),
-    check('type', 'Type must be Online or Physical').isIn(['Online', 'Physical']),
-    check('date', 'Please include a valid date').isISO8601(),
-    check('time', 'Time is required').not().isEmpty(),
+    check('type', 'Type must be virtual, hybrid, or in person').isIn(['virtual', 'hybrid', 'in person']),
+    check('startDate', 'Please include a valid start date').isISO8601(),
+    check('startTime', 'Start time is required').not().isEmpty(),
     check('location', 'Location is required').not().isEmpty()
   ],
   eventController.publishEvent

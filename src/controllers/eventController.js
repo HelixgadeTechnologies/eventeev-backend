@@ -28,7 +28,7 @@ exports.getEventListing = async (req, res) => {
     // Base query: Only published and upcoming events
     const query = { 
       status: 'Published', 
-      date: { $gte: now } 
+      startDate: { $gte: now } 
     };
 
     // Filter by category if provided
@@ -43,14 +43,14 @@ exports.getEventListing = async (req, res) => {
       const diff = 7 - (now.getDay() === 0 ? 7 : now.getDay());
       endOfWeek.setDate(now.getDate() + diff);
       endOfWeek.setHours(23, 59, 59, 999);
-      query.date.$lte = endOfWeek;
+      query.startDate.$lte = endOfWeek;
     } else if (duration === 'month') {
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       endOfMonth.setHours(23, 59, 59, 999);
-      query.date.$lte = endOfMonth;
+      query.startDate.$lte = endOfMonth;
     }
 
-    const events = await Event.find(query).sort({ date: 1 });
+    const events = await Event.find(query).sort({ startDate: 1 });
     res.json(events);
   } catch (error) {
     console.error('[Get Event Listing] Error:', error);
@@ -98,7 +98,25 @@ exports.publishEvent = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { title, description, category, type, date, time, location, bannerImage, status } = req.body;
+  const { 
+    title, 
+    description, 
+    category, 
+    type, 
+    startDate, 
+    endDate,
+    startTime, 
+    endTime,
+    location, 
+    bannerImage, 
+    thumbnailImage,
+    website,
+    facebookUrl,
+    instagramUrl,
+    xUrl,
+    recurrentEvent,
+    status 
+  } = req.body;
 
   try {
     const event = new Event({
@@ -107,10 +125,18 @@ exports.publishEvent = async (req, res) => {
       description,
       category,
       type,
-      date,
-      time,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
       location,
       bannerImage,
+      thumbnailImage,
+      website,
+      facebookUrl,
+      instagramUrl,
+      xUrl,
+      recurrentEvent,
       status: status || 'Published'
     });
     

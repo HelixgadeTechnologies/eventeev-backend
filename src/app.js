@@ -34,6 +34,7 @@ app.use('/api/schedule', require('./routes/schedule'));
 app.use('/api/checklist', require('./routes/checklist'));
 app.use('/api/link', require('./routes/link'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/upload', require('./routes/upload'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

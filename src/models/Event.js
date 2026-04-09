@@ -21,16 +21,33 @@ const mongoose = require('mongoose');
  *           type: string
  *         type:
  *           type: string
- *           enum: [Online, Physical]
- *         date:
+ *           enum: [virtual, hybrid, in person]
+ *         startDate:
  *           type: string
  *           format: date-time
- *         time:
+ *         endDate:
+ *           type: string
+ *           format: date-time
+ *         startTime:
+ *           type: string
+ *         endTime:
  *           type: string
  *         location:
  *           type: string
  *         bannerImage:
  *           type: string
+ *         thumbnailImage:
+ *           type: string
+ *         website:
+ *           type: string
+ *         facebookUrl:
+ *           type: string
+ *         instagramUrl:
+ *           type: string
+ *         xUrl:
+ *           type: string
+ *         recurrentEvent:
+ *           type: boolean
  *         status:
  *           type: string
  *           enum: [Draft, Published, Completed]
@@ -42,8 +59,8 @@ const mongoose = require('mongoose');
  *         title: Annual Tech Summit 2026
  *         description: A large-scale event for technology enthusiasts
  *         category: Conference
- *         type: Physical
- *         date: 2026-05-15T10:00:00Z
+ *         type: physical
+ *         startDate: 2026-05-15T10:00:00Z
  *         status: Published
  */
 const EventSchema = new mongoose.Schema({
@@ -62,16 +79,22 @@ const EventSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Online', 'Physical'],
+    enum: ['virtual', 'hybrid', 'in person'],
     required: [true, 'Please add an event type'],
   },
-  date: {
+  startDate: {
     type: Date,
-    required: [true, 'Please add a date'],
+    required: [true, 'Please add a start date'],
   },
-  time: {
+  endDate: {
+    type: Date,
+  },
+  startTime: {
     type: String,
-    required: [true, 'Please add a time'],
+    required: [true, 'Please add a start time'],
+  },
+  endTime: {
+    type: String,
   },
   location: {
     type: String,
@@ -79,6 +102,25 @@ const EventSchema = new mongoose.Schema({
   },
   bannerImage: {
     type: String,
+  },
+  thumbnailImage: {
+    type: String,
+  },
+  website: {
+    type: String,
+  },
+  facebookUrl: {
+    type: String,
+  },
+  instagramUrl: {
+    type: String,
+  },
+  xUrl: {
+    type: String,
+  },
+  recurrentEvent: {
+    type: Boolean,
+    default: false,
   },
   status: {
     type: String,
