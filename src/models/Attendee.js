@@ -46,6 +46,10 @@ const AttendeeSchema = new mongoose.Schema({
     ref: 'Event',
     required: true,
   },
+  ticketId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Ticket',
+  },
   name: {
     type: String,
     required: [true, 'Please add a name'],

@@ -1,7 +1,9 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
+const sendEmail = require('../utils/sendEmail');
 
 /**
  * @desc    Register a new user
@@ -167,24 +169,81 @@ exports.forgotPassword = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    // Simulate sending email
-    res.json({ message: 'Reset link sent to your email' });
+
+    // Get reset token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+
+    // Hash and set to resetPasswordToken field
+    user.resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Set expire
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    await user.save({ validateBeforeSave: false });
+
+    // Create reset url
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/resetpassword/${resetToken}`;
+
+    const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a put request to: \n\n ${resetUrl}`;
+
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: 'Password reset token',
+        message,
+        html: `<p>You requested a password reset. Please use the following link to reset your password:</p><a href="${resetUrl}">${resetUrl}</a>`
+      });
+
+      res.status(200).json({ success: true, message: 'Email sent' });
+    } catch (err) {
+      console.error(err);
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+
+      await user.save({ validateBeforeSave: false });
+
+      return res.status(500).json({ message: 'Email could not be sent' });
+    }
   } catch (error) {
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };
 
 /**
  * @desc    Reset Password
- * @route   POST /api/auth/resetpassword/:token
+ * @route   PUT /api/auth/resetpassword/:token
  * @access  Public
  */
 exports.resetPassword = async (req, res) => {
-  const { password } = req.body;
   try {
-    // In a real app, find user by reset token and update password
-    res.json({ message: 'Password reset successful' });
+    // Get hashed token
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid token' });
+    }
+
+    // Set new password
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (error) {
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };
@@ -196,9 +255,25 @@ exports.resetPassword = async (req, res) => {
  */
 exports.verifyEmail = async (req, res) => {
   try {
-    // In a real app, find user by verification token and mark as verified
+    // Hash token
+    const verificationToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid verification token' });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
+
     res.json({ message: 'Email verified successfully' });
   } catch (error) {
+    console.error(error);
     res.status(500).send('Server Error');
   }
 };

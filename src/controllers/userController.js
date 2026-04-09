@@ -1,6 +1,20 @@
 const User = require('../models/User');
 
 /**
+ * @desc    Get current logged in user
+ * @route   GET /api/user/me
+ * @access  Private
+ */
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    res.json(user);
+  } catch (error) {
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
  * @desc    Update user profile
  * @route   PUT /api/user/updateuser/:id
  * @access  Private

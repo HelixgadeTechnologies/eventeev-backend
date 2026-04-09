@@ -1,4 +1,5 @@
 const Ticket = require('../models/Ticket');
+const Attendee = require('../models/Attendee');
 
 /**
  * @desc    Create ticket
@@ -83,11 +84,8 @@ exports.getTicketsByEvent = async (req, res) => {
  */
 exports.getAttendeesByTicket = async (req, res) => {
   try {
-    // This would likely involve a Register/Order model, which we haven't created yet.
-    // For now, returning a mock list to signify the endpoint is ready for integration.
-    res.json([
-      { name: 'Mock Attendee', email: 'attendee@example.com', status: 'confirmed' }
-    ]);
+    const attendees = await Attendee.find({ ticketId: req.params.ticketId });
+    res.json(attendees);
   } catch (error) {
     res.status(500).send('Server Error');
   }

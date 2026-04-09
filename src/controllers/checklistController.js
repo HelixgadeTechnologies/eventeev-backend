@@ -71,11 +71,10 @@ exports.updateChecklistItem = async (req, res) => {
  */
 exports.deleteChecklistItem = async (req, res) => {
   try {
-    const checklistItem = await Checklist.findById(req.params.id);
+    const checklistItem = await Checklist.findByIdAndDelete(req.params.id);
     if (!checklistItem) {
       return res.status(404).json({ message: 'Checklist item not found' });
     }
-    await checklistItem.remove();
     res.json({ message: 'Checklist item removed' });
   } catch (error) {
     console.error(error.message);
