@@ -10,8 +10,14 @@ const Speaker = require('../models/Speaker');
  */
 exports.getPublicEventBySlug = async (req, res) => {
   try {
-    const event = await Event.findOne({ slug: req.params.slug, status: 'Published' });
+    // Try finding by slug first
+    let event = await Event.findOne({ slug: req.params.slug, status: 'Published' });
     
+    // Fallback: Try finding by ID if no slug matches (useful for legacy events)
+    if (!event && req.params.slug.match(/^[0-9a-fA-F]{24}$/)) {
+      event = await Event.findOne({ _id: req.params.slug, status: 'Published' });
+    }
+
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
@@ -20,8 +26,8 @@ exports.getPublicEventBySlug = async (req, res) => {
     const tickets = await Ticket.find({ eventId: event._id, status: 'Active' });
     const speakers = await Speaker.find({ eventId: event._id });
 
-    // Construct response with shareable URL
-    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.vercel.app'}/events/${event.slug}`;
+    // Construct response with shareable URL (fallback to ID if slug is missing)
+    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.vercel.app'}/events/${event.slug || event._id}`;
 
     res.json({
       ...event._doc,
@@ -252,7 +258,7 @@ exports.getEventById = async (req, res) => {
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
-    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.vercel.app'}/events/${event.slug}`;
+    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.vercel.app'}/events/${event.slug || event._id}`;
     
     res.json({
       ...event._doc,
