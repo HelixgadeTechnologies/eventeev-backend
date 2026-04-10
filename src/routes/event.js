@@ -172,6 +172,7 @@ router.post('/drafttolive/:id', auth, eventController.draftToLive);
  *         description: Event not found
  */
 router.get('/:id', eventController.getEventById);
+router.put('/:id', auth, eventController.updateEvent);
 
 /**
  * @openapi

@@ -179,6 +179,35 @@ exports.deleteEvent = async (req, res) => {
   }
 };
 /**
+ * @desc    Update event
+ * @route   PUT /api/event/:id
+ * @access  Private
+ */
+exports.updateEvent = async (req, res) => {
+  try {
+    let event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Update event
+    event = await Event.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    res.json(event);
+  } catch (error) {
+    console.error('[Update Event] Error:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
  * @desc    Get event by ID
  * @route   GET /api/event/:id
  * @access  Public
