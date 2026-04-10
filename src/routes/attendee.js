@@ -98,4 +98,30 @@ router.post('/create', attendeeController.createAttendee);
  */
 router.delete('/:id', attendeeController.deleteAttendee);
 
+/**
+ * @openapi
+ * /api/attendee/register:
+ *   post:
+ *     tags: [Attendees]
+ *     summary: Public registration for an event (unauthenticated)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [eventId, name, email]
+ *             properties:
+ *               eventId: { type: string }
+ *               name: { type: string }
+ *               email: { type: string }
+ *               ticketId: { type: string }
+ *     responses:
+ *       201:
+ *         description: Successfully registered
+ *       400:
+ *         description: Already registered or Sold out
+ */
+router.post('/register', attendeeController.registerAttendee);
+
 module.exports = router;

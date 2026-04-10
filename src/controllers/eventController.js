@@ -1,5 +1,39 @@
 const { validationResult } = require('express-validator');
 const Event = require('../models/Event');
+const Ticket = require('../models/Ticket');
+const Speaker = require('../models/Speaker');
+
+/**
+ * @desc    Get public event details by slug
+ * @route   GET /api/event/public/:slug
+ * @access  Public
+ */
+exports.getPublicEventBySlug = async (req, res) => {
+  try {
+    const event = await Event.findOne({ slug: req.params.slug, status: 'Published' });
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Fetch associated data
+    const tickets = await Ticket.find({ eventId: event._id, status: 'Active' });
+    const speakers = await Speaker.find({ eventId: event._id });
+
+    // Construct response with shareable URL
+    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.vercel.app'}/events/${event.slug}`;
+
+    res.json({
+      ...event._doc,
+      publicUrl,
+      tickets,
+      speakers
+    });
+  } catch (error) {
+    console.error('[Get Public Event By Slug] Error:', error);
+    res.status(500).send('Server Error');
+  }
+};
 
 /**
  * @desc    Get all published events
@@ -218,7 +252,12 @@ exports.getEventById = async (req, res) => {
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
-    res.json(event);
+    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.vercel.app'}/events/${event.slug}`;
+    
+    res.json({
+      ...event._doc,
+      publicUrl
+    });
   } catch (error) {
     console.error('[Get Event By ID] Error:', error);
     if (error.kind === 'ObjectId') {

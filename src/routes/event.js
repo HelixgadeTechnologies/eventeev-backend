@@ -33,6 +33,7 @@ const auth = require('../middleware/auth');
  *                 $ref: '#/components/schemas/Event'
  */
 router.get('/listing', eventController.getEventListing);
+router.get('/public/:slug', eventController.getPublicEventBySlug);
 
 /**
  * @openapi

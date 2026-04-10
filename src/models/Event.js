@@ -63,11 +63,17 @@ const mongoose = require('mongoose');
  *         startDate: 2026-05-15T10:00:00Z
  *         status: Published
  */
+const slugify = require('../utils/slugify');
+
 const EventSchema = new mongoose.Schema({
   title: {
     type: String,
     required: [true, 'Please add a title'],
     trim: true,
+  },
+  slug: {
+    type: String,
+    unique: true,
   },
   description: {
     type: String,
@@ -137,6 +143,28 @@ const EventSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+});
+
+// Create event slug from the title
+EventSchema.pre('save', async function (next) {
+  if (!this.isModified('title')) {
+    next();
+  }
+
+  let generatedSlug = slugify(this.title);
+  
+  // Check for slug uniqueness
+  let slugExists = await this.constructor.findOne({ slug: generatedSlug });
+  let counter = 1;
+  
+  while (slugExists && slugExists._id.toString() !== this._id.toString()) {
+    generatedSlug = `${slugify(this.title)}-${counter}`;
+    slugExists = await this.constructor.findOne({ slug: generatedSlug });
+    counter++;
+  }
+  
+  this.slug = generatedSlug;
+  next();
 });
 
 module.exports = mongoose.model('Event', EventSchema);
