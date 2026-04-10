@@ -36,7 +36,7 @@ const auth = require('../middleware/auth');
  *                   type: string
  */
 // Wrapped Multer middleware to catch errors
-router.post('/', auth, (req, res, next) => {
+router.post('/', auth, (req, res) => {
   parser.single('image')(req, res, (err) => {
     if (err) {
       console.error('[Multer/Cloudinary Error]:', err);
@@ -46,8 +46,9 @@ router.post('/', auth, (req, res, next) => {
         error: err.message || 'Unknown upload error' 
       });
     }
-    next();
-  }, uploadController.uploadImage);
+    // Successfully uploaded to Cloudinary, now return the response
+    uploadController.uploadImage(req, res);
+  });
 });
 
 module.exports = router;
