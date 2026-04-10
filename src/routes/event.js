@@ -153,6 +153,29 @@ router.post('/drafttolive/:id', auth, eventController.draftToLive);
 /**
  * @openapi
  * /api/event/{id}:
+ *   get:
+ *     tags: [Events]
+ *     summary: Get event by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Event'
+ *       404:
+ *         description: Event not found
+ */
+router.get('/:id', eventController.getEventById);
+
+/**
+ * @openapi
+ * /api/event/{id}:
  *   delete:
  *     tags: [Events]
  *     summary: Delete an event

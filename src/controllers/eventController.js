@@ -178,3 +178,23 @@ exports.deleteEvent = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+/**
+ * @desc    Get event by ID
+ * @route   GET /api/event/:id
+ * @access  Public
+ */
+exports.getEventById = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    res.json(event);
+  } catch (error) {
+    console.error('[Get Event By ID] Error:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    res.status(500).send('Server Error');
+  }
+};

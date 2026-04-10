@@ -8,10 +8,26 @@ const { getIO } = require('../utils/socket');
  */
 exports.getNotifications = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
     const notifications = await Notification.find({ recipient: req.user.id })
       .sort({ createdAt: -1 })
-      .limit(50);
-    res.json(notifications);
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Notification.countDocuments({ recipient: req.user.id });
+
+    res.json({
+      notifications,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('[Notification Controller] getNotifications Error:', error);
     res.status(500).send('Server Error');
@@ -82,7 +98,7 @@ exports.deleteNotification = async (req, res) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    await notification.remove();
+    await Notification.findByIdAndDelete(req.params.id);
     res.json({ message: 'Notification removed' });
   } catch (error) {
     console.error('[Notification Controller] deleteNotification Error:', error);
