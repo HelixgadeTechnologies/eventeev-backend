@@ -20,8 +20,27 @@ exports.getSpeakersByEvent = async (req, res) => {
  * @access  Private
  */
 exports.createSpeaker = async (req, res) => {
-  const { eventId, firstName, lastName, title, company, bio, topic, photo, socialLinks } = req.body;
+  const { 
+    eventId, 
+    firstName, 
+    lastName, 
+    title, 
+    company, 
+    bio, 
+    topic, 
+    photo, 
+    socialLinks,
+    twitter,
+    companyTwitter
+  } = req.body;
+
   try {
+    // Structure social links if they were passed flatly
+    const finalSocialLinks = socialLinks || {
+      twitter: twitter || '',
+      companyTwitter: companyTwitter || ''
+    };
+
     const speaker = new Speaker({
       eventId,
       firstName,
@@ -31,11 +50,25 @@ exports.createSpeaker = async (req, res) => {
       bio,
       topic,
       photo,
-      socialLinks
+      socialLinks: finalSocialLinks
     });
+
     await speaker.save();
     res.status(201).json(speaker);
   } catch (error) {
+    console.error('[Create Speaker] Error:', error);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ message: messages.join(', ') });
+    }
+
+    // Handle invalid ObjectId for eventId
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ message: 'Invalid Event ID' });
+    }
+
     res.status(500).send('Server Error');
   }
 };
