@@ -165,7 +165,7 @@ exports.getSpeakerStats = async (req, res) => {
 
     res.json({
       totalSpeakers,
-      totalTopics,
+      totalTopics: uniqueTopics,
       totalSessions
     });
   } catch (error) {
