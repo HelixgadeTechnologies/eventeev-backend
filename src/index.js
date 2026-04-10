@@ -23,23 +23,13 @@ if (missingEnvVars.length > 0) {
   console.log('[SUCCESS] All required environment variables are present.');
 }
 
+const { initSocket } = require('./utils/socket');
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Adjust this in production
-    methods: ["GET", "POST"]
-  }
-});
+const io = initSocket(server);
 
-// Socket.io Implementation
+// socket.js handles the connection and notification rooms.
+// We'll keep the message logic here for now, but use the io instance from initSocket.
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-
-  socket.on('join_room', (roomId) => {
-    socket.join(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`);
-  });
-
   socket.on('send_message', async (data) => {
     const { room, sender, content, type } = data;
     try {
@@ -51,17 +41,11 @@ io.on('connection', (socket) => {
       });
       await newMessage.save();
       
-      // Populate sender before emitting
       const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name avatar');
-      
       io.to(room).emit('receive_message', populatedMessage);
     } catch (error) {
       console.error('Error sending message via socket:', error);
     }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected');
   });
 });
 
