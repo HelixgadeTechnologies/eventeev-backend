@@ -137,3 +137,39 @@ exports.manageSessions = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Get speaker stats for an event
+ * @route   GET /api/speaker/event/:eventId/stats
+ * @access  Public
+ */
+exports.getSpeakerStats = async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    
+    // Count total speakers
+    const totalSpeakers = await Speaker.countDocuments({ eventId });
+    
+    // Get all speakers to calculate topics and sessions
+    const speakers = await Speaker.find({ eventId });
+    
+    // Count unique topics
+    const uniqueTopics = new Set(
+      speakers
+        .map(s => s.topic)
+        .filter(t => t && t.trim() !== '')
+    ).size;
+    
+    // Count total sessions
+    const totalSessions = speakers.reduce((acc, s) => acc + (s.sessions?.length || 0), 0);
+
+    res.json({
+      totalSpeakers,
+      totalTopics,
+      totalSessions
+    });
+  } catch (error) {
+    console.error('[Get Speaker Stats] Error:', error);
+    res.status(500).send('Server Error');
+  }
+};

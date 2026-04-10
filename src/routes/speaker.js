@@ -25,6 +25,7 @@ const speakerController = require('../controllers/speakerController');
  *                 $ref: '#/components/schemas/Speaker'
  */
 router.get('/event/:eventId', speakerController.getSpeakersByEvent);
+router.get('/event/:eventId/stats', speakerController.getSpeakerStats);
 
 /**
  * @openapi
