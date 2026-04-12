@@ -2,6 +2,8 @@ const { validationResult } = require('express-validator');
 const Event = require('../models/Event');
 const Ticket = require('../models/Ticket');
 const Speaker = require('../models/Speaker');
+const { isEventExpired } = require('../utils/eventStatus');
+
 
 /**
  * @desc    Get public event details by slug
@@ -49,11 +51,24 @@ exports.getPublicEventBySlug = async (req, res) => {
 exports.getPublishedEvents = async (req, res) => {
   try {
     const events = await Event.find({ status: 'Published' });
-    res.json(events);
+    
+    // Check for expiration on-the-fly to ensure UI accuracy
+    const updatedEvents = [];
+    for (const event of events) {
+      if (isEventExpired(event)) {
+        event.status = 'Completed';
+        await event.save();
+      } else {
+        updatedEvents.push(event);
+      }
+    }
+
+    res.json(updatedEvents);
   } catch (error) {
     res.status(500).send('Server Error');
   }
 };
+
 
 /**
  * @desc    Get event listing for landing page (Upcoming published events)
@@ -91,7 +106,20 @@ exports.getEventListing = async (req, res) => {
     }
 
     const events = await Event.find(query).sort({ startDate: 1 });
-    res.json(events);
+    
+    // Check for expiration on-the-fly
+    const updatedEvents = [];
+    for (const event of events) {
+      if (isEventExpired(event)) {
+        event.status = 'Completed';
+        await event.save();
+      } else {
+        updatedEvents.push(event);
+      }
+    }
+
+    res.json(updatedEvents);
+
   } catch (error) {
     console.error('[Get Event Listing] Error:', error);
     res.status(500).send('Server Error');
