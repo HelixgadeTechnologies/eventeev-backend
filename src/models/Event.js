@@ -148,7 +148,7 @@ const EventSchema = new mongoose.Schema({
 // Create event slug from the title
 EventSchema.pre('save', async function (next) {
   if (!this.isModified('title')) {
-    next();
+    return next();
   }
 
   let generatedSlug = slugify(this.title);

@@ -212,7 +212,13 @@ exports.publishEvent = async (req, res) => {
     res.status(201).json(event);
   } catch (error) {
     console.error('[Publish Event] Error:', error);
-    res.status(500).send('Server Error');
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Validation Error', errors: error.message });
+    }
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Duplicate field value entered', duplicate: error.keyValue });
+    }
+    res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
