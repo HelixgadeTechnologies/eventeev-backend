@@ -62,6 +62,9 @@ const AttendeeSchema = new mongoose.Schema({
     type: String,
     unique: true,
   },
+  qrCode: {
+    type: String,
+  },
   isCheckedIn: {
     type: Boolean,
     default: false,
