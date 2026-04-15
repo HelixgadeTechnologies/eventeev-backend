@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail');
+const getWelcomeEmailHtml = require('../utils/welcomeEmailTemplate');
 
 /**
  * @desc    Register a new user
@@ -65,19 +66,9 @@ exports.register = async (req, res) => {
         try {
           await sendEmail({
             email: user.email,
-            subject: `Welcome to eventeev, ${user.firstName}! Let’s get your event live 🚀`,
-            message: `Hi ${user.firstName},\nWelcome to the eventeev family! We’re thrilled to have you on board. You’ve just taken the first step toward creating a seamless, high-impact event experience.\n\nOur goal is to make your planning process as stress-free as possible. Here is a quick breakdown of what you can do right now to get started:\n\nCreate Your First Event: Head to your dashboard to set up your event page, ticket types, and games for your attendees.\n\nCustomize Your Registration: Tailor your attendee forms to get the exact data you need.\n\nExplore the Toolkit: Check out our real-time analytics and check-in tools.\n\nPro Tip: Events with a detailed description and a high-quality banner image see a 30% higher registration rate!\n\nNeed a hand? Our support team is just a reply away, or you can browse our Help Center for quick tutorials.\n\nCheers,\nThe eventeev Team`,
-            html: `<p>Hi ${user.firstName},</p>
-<p>Welcome to the eventeev family! We’re thrilled to have you on board. You’ve just taken the first step toward creating a seamless, high-impact event experience.</p>
-<p>Our goal is to make your planning process as stress-free as possible. Here is a quick breakdown of what you can do right now to get started:</p>
-<ul>
-  <li><strong>Create Your First Event:</strong> Head to your dashboard to set up your event page, ticket types, and games for your attendees.</li>
-  <li><strong>Customize Your Registration:</strong> Tailor your attendee forms to get the exact data you need.</li>
-  <li><strong>Explore the Toolkit:</strong> Check out our real-time analytics and check-in tools.</li>
-</ul>
-<p><strong>Pro Tip:</strong> Events with a detailed description and a high-quality banner image see a 30% higher registration rate!</p>
-<p>Need a hand? Our support team is just a reply away, or you can browse our Help Center for quick tutorials.</p>
-<p>Cheers,<br>The eventeev Team</p>`
+            subject: `Welcome to eventeev, ${user.firstName}! Let's get your event live 🚀`,
+            message: `Hi ${user.firstName}, welcome to the eventeev family! Head to your dashboard to create your first event, customize your registration forms, and explore our real-time analytics tools. Pro Tip: Events with a detailed description and a high-quality banner image see a 30% higher registration rate!`,
+            html: getWelcomeEmailHtml(user.firstName)
           });
         } catch (emailErr) {
           console.error('[Registration] Welcome email sending error:', emailErr);
