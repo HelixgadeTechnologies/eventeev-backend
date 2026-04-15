@@ -205,13 +205,60 @@ exports.checkInAttendee = async (req, res) => {
  */
 exports.createAttendee = async (req, res) => {
   try {
+    const { eventId, name, email, ticketId } = req.body;
+
     const attendeeId = new mongoose.Types.ObjectId();
     const orderId = `CK-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
+
     const attendee = new Attendee({ ...req.body, _id: attendeeId, orderId, qrCode: qrCodeUrl });
     await attendee.save();
+
+    // Send order confirmation email
+    try {
+      const event = await Event.findById(eventId);
+      let ticket = null;
+      if (ticketId) {
+        ticket = await Ticket.findById(ticketId);
+      }
+
+      if (event) {
+        const eventDate = new Date(event.startDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const ticketType = ticket ? ticket.name : 'General Admission';
+        const amountPaid = ticket && ticket.price ? `$${ticket.price}` : 'Free';
+
+        await sendEmail({
+          email: email,
+          subject: `You're In! Confirmation for ${event.title}`,
+          message: `Hi ${name},\nYour registration for ${event.title} has been confirmed by the event organiser.\n\nOrder ID: #${orderId}\nTicket Type: ${ticketType}\nTotal Paid: ${amountPaid}\n\nPlease present your QR code at the door.\n\nSee you soon!\nThe ${event.title} Team`,
+          html: `<p>Hi ${name},</p>
+<p>Your registration for <strong>${event.title}</strong> has been confirmed by the event organiser.</p>
+<h3>Event Details</h3>
+<ul>
+  <li><strong>Event:</strong> ${event.title}</li>
+  <li><strong>Date:</strong> ${eventDate}</li>
+  <li><strong>Time:</strong> ${event.startTime || 'TBD'}</li>
+  <li><strong>Location:</strong> ${event.location || 'Online'}</li>
+</ul>
+<h3>Your Entry Ticket</h3>
+<p>Please have your QR code ready on your phone or printed for check-in at the door.</p>
+<p><img src="${qrCodeUrl}" alt="QR Code" /></p>
+<h3>Order Summary</h3>
+<ul>
+  <li><strong>Order ID:</strong> #${orderId}</li>
+  <li><strong>Ticket Type:</strong> ${ticketType}</li>
+  <li><strong>Total Paid:</strong> ${amountPaid}</li>
+</ul>
+<p>See you soon!<br>The ${event.title} Team<br><em>Powered by eventeev</em></p>`
+        });
+      }
+    } catch (emailErr) {
+      console.error('[Create Attendee] Confirmation email error:', emailErr);
+    }
+
     res.status(201).json(attendee);
   } catch (error) {
+    console.error('[Create Attendee] Error:', error);
     res.status(500).send('Server Error');
   }
 };
