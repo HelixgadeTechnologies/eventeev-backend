@@ -31,7 +31,7 @@ const getWelcomeEmailHtml = (firstName) => `
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <span style="font-size:22px; font-weight:900; color:#EB5017; letter-spacing:-0.5px;">eventeev</span>
+                  <img src="https://eventeev.vercel.app/logo-black.svg" alt="eventeev" height="28" style="display:block; border:0; outline:none;" />
                 </td>
                 <td align="right">
                   <span style="font-size:11px; font-weight:600; color:#9CA3AF; letter-spacing:1px; text-transform:uppercase;">Welcome Email</span>
@@ -122,18 +122,22 @@ const getWelcomeEmailHtml = (firstName) => `
                   <table width="100%" cellpadding="0" cellspacing="0" style="background:#FAFAFA; border:1px solid #F3F4F6; border-radius:16px; overflow:hidden;">
                     <tr>
                       <td style="padding:24px 16px; text-align:center;">
-                        <div style="width:48px; height:48px; background:linear-gradient(135deg,#FFEDE5,#FFC9B0); border-radius:14px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
-                          <!-- Calendar icon -->
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:12px auto 0;">
-                            <rect x="3" y="4" width="18" height="17" rx="3" fill="#EB5017" opacity="0.15"/>
-                            <rect x="3" y="4" width="18" height="7" rx="3" fill="#EB5017" opacity="0.8"/>
-                            <circle cx="8" cy="15" r="1.5" fill="#EB5017"/>
-                            <circle cx="12" cy="15" r="1.5" fill="#EB5017"/>
-                            <circle cx="16" cy="15" r="1.5" fill="#EB5017"/>
-                            <line x1="8" y1="2" x2="8" y2="6" stroke="#EB5017" stroke-width="2" stroke-linecap="round"/>
-                            <line x1="16" y1="2" x2="16" y2="6" stroke="#EB5017" stroke-width="2" stroke-linecap="round"/>
-                          </svg>
-                        </div>
+                        <!-- Card 1 icon: Calendar -->
+                        <table cellpadding="0" cellspacing="0" style="margin:0 auto 14px auto;">
+                          <tr>
+                            <td width="48" height="48" align="center" valign="middle" style="background:linear-gradient(135deg,#FFEDE5,#FFC9B0); border-radius:14px;">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="3" y="4" width="18" height="17" rx="3" fill="#EB5017" opacity="0.15"/>
+                                <rect x="3" y="4" width="18" height="7" rx="3" fill="#EB5017" opacity="0.8"/>
+                                <circle cx="8" cy="15" r="1.5" fill="#EB5017"/>
+                                <circle cx="12" cy="15" r="1.5" fill="#EB5017"/>
+                                <circle cx="16" cy="15" r="1.5" fill="#EB5017"/>
+                                <line x1="8" y1="2" x2="8" y2="6" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="16" y1="2" x2="16" y2="6" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                              </svg>
+                            </td>
+                          </tr>
+                        </table>
                         <p style="font-size:13px; font-weight:800; color:#1B1818; margin-top:12px; letter-spacing:-0.2px;">Create Your Event</p>
                         <p style="font-size:11px; color:#9CA3AF; margin-top:6px; line-height:1.5; font-weight:500;">Set up your event page with tickets &amp; details</p>
                       </td>
@@ -145,18 +149,28 @@ const getWelcomeEmailHtml = (firstName) => `
                   <table width="100%" cellpadding="0" cellspacing="0" style="background:#FAFAFA; border:1px solid #F3F4F6; border-radius:16px; overflow:hidden;">
                     <tr>
                       <td style="padding:24px 16px; text-align:center;">
-                        <div style="width:48px; height:48px; background:linear-gradient(135deg,#FFEDE5,#FFC9B0); border-radius:14px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:12px auto 0;">
-                            <line x1="4" y1="8" x2="20" y2="8" stroke="#EB5017" stroke-width="2" stroke-linecap="round"/>
-                            <line x1="4" y1="12" x2="20" y2="12" stroke="#EB5017" stroke-width="2" stroke-linecap="round"/>
-                            <line x1="4" y1="16" x2="20" y2="16" stroke="#EB5017" stroke-width="2" stroke-linecap="round"/>
-                            <circle cx="8" cy="8" r="2.5" fill="white" stroke="#EB5017" stroke-width="1.5"/>
-                            <circle cx="16" cy="12" r="2.5" fill="white" stroke="#EB5017" stroke-width="1.5"/>
-                            <circle cx="10" cy="16" r="2.5" fill="white" stroke="#EB5017" stroke-width="1.5"/>
-                          </svg>
-                        </div>
-                        <p style="font-size:13px; font-weight:800; color:#1B1818; margin-top:12px; letter-spacing:-0.2px;">Customize Forms</p>
-                        <p style="font-size:11px; color:#9CA3AF; margin-top:6px; line-height:1.5; font-weight:500;">Tailor registration to collect the exact data you need</p>
+                        <!-- Card 2 icon: QR Scan -->
+                        <table cellpadding="0" cellspacing="0" style="margin:0 auto 14px auto;">
+                          <tr>
+                            <td width="48" height="48" align="center" valign="middle" style="background:linear-gradient(135deg,#FFEDE5,#FFC9B0); border-radius:14px;">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#EB5017" stroke-width="1.8" fill="none"/>
+                                <rect x="5" y="5" width="3" height="3" rx="0.5" fill="#EB5017"/>
+                                <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#EB5017" stroke-width="1.8" fill="none"/>
+                                <rect x="5" y="16" width="3" height="3" rx="0.5" fill="#EB5017"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#EB5017" stroke-width="1.8" fill="none"/>
+                                <rect x="16" y="5" width="3" height="3" rx="0.5" fill="#EB5017"/>
+                                <line x1="14" y1="14" x2="14" y2="17" stroke="#EB5017" stroke-width="1.8" stroke-linecap="round"/>
+                                <line x1="14" y1="17" x2="17" y2="17" stroke="#EB5017" stroke-width="1.8" stroke-linecap="round"/>
+                                <line x1="21" y1="14" x2="21" y2="17" stroke="#EB5017" stroke-width="1.8" stroke-linecap="round"/>
+                                <line x1="18" y1="21" x2="21" y2="21" stroke="#EB5017" stroke-width="1.8" stroke-linecap="round"/>
+                                <line x1="21" y1="17" x2="21" y2="21" stroke="#EB5017" stroke-width="1.8" stroke-linecap="round"/>
+                              </svg>
+                            </td>
+                          </tr>
+                        </table>
+                        <p style="font-size:13px; font-weight:800; color:#1B1818; margin-top:12px; letter-spacing:-0.2px;">Sleek Check-ins</p>
+                        <p style="font-size:11px; color:#9CA3AF; margin-top:6px; line-height:1.5; font-weight:500;">Scan QR codes &amp; verify attendees instantly at the door</p>
                       </td>
                     </tr>
                   </table>
@@ -166,13 +180,19 @@ const getWelcomeEmailHtml = (firstName) => `
                   <table width="100%" cellpadding="0" cellspacing="0" style="background:#FAFAFA; border:1px solid #F3F4F6; border-radius:16px; overflow:hidden;">
                     <tr>
                       <td style="padding:24px 16px; text-align:center;">
-                        <div style="width:48px; height:48px; background:linear-gradient(135deg,#FFEDE5,#FFC9B0); border-radius:14px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block; margin:12px auto 0;">
-                            <rect x="4" y="13" width="4" height="7" rx="1.5" fill="#EB5017" opacity="0.5"/>
-                            <rect x="10" y="9" width="4" height="11" rx="1.5" fill="#EB5017" opacity="0.75"/>
-                            <rect x="16" y="5" width="4" height="15" rx="1.5" fill="#EB5017"/>
-                          </svg>
-                        </div>
+                        <!-- Card 3 icon: Analytics -->
+                        <table cellpadding="0" cellspacing="0" style="margin:0 auto 14px auto;">
+                          <tr>
+                            <td width="48" height="48" align="center" valign="middle" style="background:linear-gradient(135deg,#FFEDE5,#FFC9B0); border-radius:14px;">
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="4" y="13" width="4" height="7" rx="1.5" fill="#EB5017" opacity="0.5"/>
+                                <rect x="10" y="9" width="4" height="11" rx="1.5" fill="#EB5017" opacity="0.75"/>
+                                <rect x="16" y="5" width="4" height="15" rx="1.5" fill="#EB5017"/>
+                                <line x1="3" y1="21" x2="21" y2="21" stroke="#EB5017" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+                              </svg>
+                            </td>
+                          </tr>
+                        </table>
                         <p style="font-size:13px; font-weight:800; color:#1B1818; margin-top:12px; letter-spacing:-0.2px;">Analytics Dashboard</p>
                         <p style="font-size:11px; color:#9CA3AF; margin-top:6px; line-height:1.5; font-weight:500;">Track check-ins, revenue &amp; attendee insights live</p>
                       </td>
@@ -225,7 +245,7 @@ const getWelcomeEmailHtml = (firstName) => `
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <span style="font-size:16px; font-weight:900; color:#1B1818; letter-spacing:-0.3px;">eventeev</span>
+                  <img src="https://eventeev.vercel.app/logo-black.svg" alt="eventeev" height="22" style="display:block; border:0; outline:none;" />
                   <p style="font-size:11px; color:#9CA3AF; margin-top:4px; font-weight:500; line-height:1.5;">
                     Making events unforgettable, one platform at a time.<br>
                     Lagos, Nigeria &bull; hello@eventeev.com
