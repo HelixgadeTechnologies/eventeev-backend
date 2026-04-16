@@ -23,14 +23,15 @@ const sendTestEmail = async () => {
 
     const htmlContent = generateRegistrationEmail(dummyData);
 
-    console.log('Sending test email to weareeventeev@gmail.com...');
+    console.log('Sending test email to alphadude4all@gmail.com...');
     
     try {
         await sendEmail({
-            email: 'weareeventeev@gmail.com',
-            subject: 'PREVIEW: Your Registration for Eventeev Launch Keynote 2026',
+            email: 'alphadude4all@gmail.com',
+            subject: 'TEST: Event Registration Confirmation',
             html: htmlContent
         });
+
         console.log('SUCCESS: Preview email sent successfully.');
     } catch (error) {
         console.error('FAILED: Error sending preview email:', error);
