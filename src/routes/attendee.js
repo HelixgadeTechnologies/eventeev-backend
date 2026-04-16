@@ -124,4 +124,25 @@ router.delete('/:id', attendeeController.deleteAttendee);
  */
 router.post('/register', attendeeController.registerAttendee);
 
+/**
+ * @openapi
+ * /api/attendee/ticket/{id}/download:
+ *   get:
+ *     tags: [Attendees]
+ *     summary: Download ticket as PDF
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: PDF file returned
+ *       404:
+ *         description: Attendee or Event not found
+ */
+router.get('/ticket/:id/download', attendeeController.downloadTicketPDF);
+
 module.exports = router;
+

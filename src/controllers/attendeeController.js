@@ -3,7 +3,11 @@ const Event = require('../models/Event');
 const Ticket = require('../models/Ticket');
 const { createNotification } = require('./notificationController');
 const sendEmail = require('../utils/sendEmail');
+const { generateRegistrationEmail } = require('../utils/registrationTemplate');
+const { generateTicketPDF } = require('../utils/pdfGenerator');
 const mongoose = require('mongoose');
+
+
 
 /**
  * @desc    Public registration for an event
@@ -81,35 +85,23 @@ exports.registerAttendee = async (req, res) => {
       const ticketType = ticket ? ticket.name : 'General Admission';
       const amountPaid = ticket && ticket.price ? `$${ticket.price}` : 'Free';
 
+      const htmlTemplate = generateRegistrationEmail({
+        name,
+        event,
+        ticketType,
+        orderId,
+        qrCodeUrl,
+        amountPaid,
+        attendeeId: attendee._id
+      });
+
+
       await sendEmail({
         email: email,
         subject: `You’re In! Confirmation for ${event.title}`,
-        message: `Hi ${name},\nGreat news! Your registration for ${event.title} is confirmed. We’ve saved a spot just for you, and we can’t wait to see you there.\n\nEvent Details\nEvent: ${event.title}\nDate: ${eventDate}\nTime: ${event.startTime || 'TBD'}\nLocation: ${event.location || 'Online'}\n\nYour Entry Ticket\nAttached to this email is your digital ticket. Please have the QR code ready on your phone or printed out for a smooth check-in at the door.\n\nOrder Summary:\nOrder ID: #${orderId}\nTicket Type: ${ticketType}\nTotal Paid: ${amountPaid}\n\n[Add to Calendar] | [View Event Page]\nManage your registration:\nIf you need to update your details or can no longer attend, you can manage your ticket through your eventeev Attendee Portal.\n\nSee you soon!\nThe ${event.title} Team\nPowered by eventeev`,
-        html: `<p>Hi ${name},</p>
-<p>Great news! Your registration for <strong>${event.title}</strong> is confirmed. We’ve saved a spot just for you, and we can’t wait to see you there.</p>
-<h3>Event Details</h3>
-<ul>
-  <li><strong>Event:</strong> ${event.title}</li>
-  <li><strong>Date:</strong> ${eventDate}</li>
-  <li><strong>Time:</strong> ${event.startTime || 'TBD'}</li>
-  <li><strong>Location:</strong> ${event.location || 'Online'}</li>
-</ul>
-<h3>Your Entry Ticket</h3>
-<p>Attached to this email is your digital ticket. Please have the QR code ready on your phone or printed out for a smooth check-in at the door.</p>
-<p><img src="${qrCodeUrl}" alt="QR Code" /></p>
-<h3>Order Summary</h3>
-<ul>
-  <li><strong>Order ID:</strong> #${orderId}</li>
-  <li><strong>Ticket Type:</strong> ${ticketType}</li>
-  <li><strong>Total Paid:</strong> ${amountPaid}</li>
-</ul>
-<p>[Add to Calendar] | [View Event Page]</p>
-<p><strong>Manage your registration:</strong><br>
-If you need to update your details or can no longer attend, you can manage your ticket through your eventeev Attendee Portal.</p>
-<p>See you soon!<br>
-The ${event.title} Team<br>
-<em>Powered by eventeev</em></p>`
+        html: htmlTemplate
       });
+
     } catch (emailErr) {
       console.error('[Register Attendee] Registration email sending error:', emailErr);
     }
@@ -227,30 +219,23 @@ exports.createAttendee = async (req, res) => {
         const ticketType = ticket ? ticket.name : 'General Admission';
         const amountPaid = ticket && ticket.price ? `$${ticket.price}` : 'Free';
 
+        const htmlTemplate = generateRegistrationEmail({
+          name,
+          event,
+          ticketType,
+          orderId,
+          qrCodeUrl,
+          amountPaid,
+          attendeeId: attendee._id
+        });
+
+
         await sendEmail({
           email: email,
           subject: `You're In! Confirmation for ${event.title}`,
-          message: `Hi ${name},\nYour registration for ${event.title} has been confirmed by the event organiser.\n\nOrder ID: #${orderId}\nTicket Type: ${ticketType}\nTotal Paid: ${amountPaid}\n\nPlease present your QR code at the door.\n\nSee you soon!\nThe ${event.title} Team`,
-          html: `<p>Hi ${name},</p>
-<p>Your registration for <strong>${event.title}</strong> has been confirmed by the event organiser.</p>
-<h3>Event Details</h3>
-<ul>
-  <li><strong>Event:</strong> ${event.title}</li>
-  <li><strong>Date:</strong> ${eventDate}</li>
-  <li><strong>Time:</strong> ${event.startTime || 'TBD'}</li>
-  <li><strong>Location:</strong> ${event.location || 'Online'}</li>
-</ul>
-<h3>Your Entry Ticket</h3>
-<p>Please have your QR code ready on your phone or printed for check-in at the door.</p>
-<p><img src="${qrCodeUrl}" alt="QR Code" /></p>
-<h3>Order Summary</h3>
-<ul>
-  <li><strong>Order ID:</strong> #${orderId}</li>
-  <li><strong>Ticket Type:</strong> ${ticketType}</li>
-  <li><strong>Total Paid:</strong> ${amountPaid}</li>
-</ul>
-<p>See you soon!<br>The ${event.title} Team<br><em>Powered by eventeev</em></p>`
+          html: htmlTemplate
         });
+
       }
     } catch (emailErr) {
       console.error('[Create Attendee] Confirmation email error:', emailErr);
@@ -277,3 +262,50 @@ exports.deleteAttendee = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Download ticket as PDF
+ * @route   GET /api/attendee/ticket/:id/download
+ * @access  Public
+ */
+exports.downloadTicketPDF = async (req, res) => {
+  try {
+    const attendee = await Attendee.findById(req.params.id);
+    if (!attendee) {
+      return res.status(404).json({ message: 'Attendee not found' });
+    }
+
+    const event = await Event.findById(attendee.eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    let ticketType = 'General Admission';
+    if (attendee.ticketId) {
+      const ticket = await Ticket.findById(attendee.ticketId);
+      if (ticket) ticketType = ticket.name;
+    }
+
+    const pdfBuffer = await generateTicketPDF({
+      attendee,
+      event,
+      ticketType
+    });
+
+    // Clean filename: AttendeeName-Ticket-OrderID.pdf
+    const safeName = attendee.name.replace(/[^a-z0-9]/gi, '_');
+    const filename = `${safeName}-Ticket-${attendee.orderId}.pdf`;
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBuffer.length,
+    });
+
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('[Download Ticket PDF] Error:', error);
+    res.status(500).send('Error generating PDF');
+  }
+};
+
