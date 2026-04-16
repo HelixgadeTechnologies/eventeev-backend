@@ -30,6 +30,18 @@ const io = initSocket(server);
 // socket.js handles the connection and notification rooms.
 // We'll keep the message logic here for now, but use the io instance from initSocket.
 io.on('connection', (socket) => {
+  console.log('User connected to base socket:', socket.id);
+
+  socket.on('join_room', (roomId) => {
+    socket.join(roomId);
+    console.log(`Socket ${socket.id} joined room ${roomId}`);
+  });
+
+  socket.on('leave_room', (roomId) => {
+    socket.leave(roomId);
+    console.log(`Socket ${socket.id} left room ${roomId}`);
+  });
+
   socket.on('send_message', async (data) => {
     const { room, sender, content, type } = data;
     try {
@@ -46,6 +58,10 @@ io.on('connection', (socket) => {
     } catch (error) {
       console.error('Error sending message via socket:', error);
     }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected from base socket');
   });
 });
 

@@ -3,7 +3,28 @@ const Event = require('../models/Event');
 const Ticket = require('../models/Ticket');
 const Speaker = require('../models/Speaker');
 const Schedule = require('../models/Schedule');
+const Room = require('../models/Room');
 const { isEventExpired } = require('../utils/eventStatus');
+
+/**
+ * @desc    Helper to ensure a General Lobby exists for an event
+ */
+const ensureGeneralLobby = async (eventId) => {
+  try {
+    const existingRoom = await Room.findOne({ event: eventId, name: 'General Lobby' });
+    if (!existingRoom) {
+      const room = new Room({
+        event: eventId,
+        name: 'General Lobby',
+        type: 'public'
+      });
+      await room.save();
+      console.log(`[Chat] General Lobby created for event ${eventId}`);
+    }
+  } catch (error) {
+    console.error(`[Chat] Error creating General Lobby for event ${eventId}:`, error);
+  }
+};
 
 
 /**
@@ -212,6 +233,10 @@ exports.publishEvent = async (req, res) => {
     });
     
     await event.save();
+    
+    // Create General Lobby room for the event
+    await ensureGeneralLobby(event._id);
+    
     res.status(201).json(event);
   } catch (error) {
     console.error('[Publish Event] Error:', error);
@@ -236,6 +261,10 @@ exports.draftToLive = async (req, res) => {
     if (!event) return res.status(404).json({ message: 'Event not found' });
     event.status = 'Published';
     await event.save();
+    
+    // Create General Lobby room for the event
+    await ensureGeneralLobby(event._id);
+    
     res.json(event);
   } catch (error) {
     res.status(500).send('Server Error');
