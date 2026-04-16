@@ -39,3 +39,47 @@ exports.getEventSchedule = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Update a schedule item
+ * @route   PUT /api/schedule/:id
+ * @access  Private
+ */
+exports.updateScheduleItem = async (req, res) => {
+  try {
+    const scheduleItem = await Schedule.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    if (!scheduleItem) {
+      return res.status(404).json({ message: 'Schedule item not found' });
+    }
+
+    res.json(scheduleItem);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Delete a schedule item
+ * @route   DELETE /api/schedule/:id
+ * @access  Private
+ */
+exports.deleteScheduleItem = async (req, res) => {
+  try {
+    const scheduleItem = await Schedule.findByIdAndDelete(req.params.id);
+
+    if (!scheduleItem) {
+      return res.status(404).json({ message: 'Schedule item not found' });
+    }
+
+    res.json({ message: 'Schedule item removed' });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};

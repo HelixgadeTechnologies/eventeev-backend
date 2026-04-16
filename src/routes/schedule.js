@@ -45,5 +45,43 @@ router.post('/', auth, scheduleController.createScheduleItem);
  *                 $ref: '#/components/schemas/Schedule'
  */
 router.get('/event/:eventId', scheduleController.getEventSchedule);
+/**
+ * @openapi
+ * /api/schedule/{id}:
+ *   put:
+ *     tags: [Schedule]
+ *     summary: Update a schedule item
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Schedule'
+ *     responses:
+ *       200:
+ *         description: Schedule item updated
+ *   delete:
+ *     tags: [Schedule]
+ *     summary: Delete a schedule item
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Schedule item removed
+ */
+router.put('/:id', auth, scheduleController.updateScheduleItem);
+router.delete('/:id', auth, scheduleController.deleteScheduleItem);
 
 module.exports = router;
