@@ -21,14 +21,17 @@ exports.getEventChecklist = async (req, res) => {
  * @access  Private
  */
 exports.createChecklistItem = async (req, res) => {
-  const { event, title, description, category, status } = req.body;
+  const { event, title, description, category, status, priority, date, time } = req.body;
   try {
     const checklistItem = new Checklist({
       event,
       title,
       description,
       category,
-      status
+      status,
+      priority,
+      date,
+      time
     });
     await checklistItem.save();
     res.status(201).json(checklistItem);
@@ -44,17 +47,20 @@ exports.createChecklistItem = async (req, res) => {
  * @access  Private
  */
 exports.updateChecklistItem = async (req, res) => {
-  const { title, description, category, status } = req.body;
+  const { title, description, category, status, priority, date, time } = req.body;
   try {
     let checklistItem = await Checklist.findById(req.params.id);
     if (!checklistItem) {
       return res.status(404).json({ message: 'Checklist item not found' });
     }
 
-    if (title) checklistItem.title = title;
-    if (description) checklistItem.description = description;
-    if (category) checklistItem.category = category;
-    if (status) checklistItem.status = status;
+    if (title !== undefined) checklistItem.title = title;
+    if (description !== undefined) checklistItem.description = description;
+    if (category !== undefined) checklistItem.category = category;
+    if (status !== undefined) checklistItem.status = status;
+    if (priority !== undefined) checklistItem.priority = priority;
+    if (date !== undefined) checklistItem.date = date;
+    if (time !== undefined) checklistItem.time = time;
 
     await checklistItem.save();
     res.json(checklistItem);

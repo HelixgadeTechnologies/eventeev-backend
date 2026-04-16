@@ -47,6 +47,17 @@ const ChecklistSchema = new mongoose.Schema({
   category: {
     type: String, // e.g., Setup, Marketing, Engagement, Logistics
   },
+  priority: {
+    type: String,
+    enum: ['high', 'medium', 'low'],
+    default: 'medium'
+  },
+  date: {
+    type: String, // e.g., "Feb 14, 2026"
+  },
+  time: {
+    type: String, // e.g., "10:00 AM"
+  },
   status: {
     type: String,
     enum: ['Done', 'Incomplete'],
