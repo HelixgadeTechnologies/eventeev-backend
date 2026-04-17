@@ -28,6 +28,7 @@ exports.register = async (req, res) => {
     }
 
     // 3. Create new user (password hashing is handled by User model middleware)
+    const randomAvatarId = Math.floor(Math.random() * 4) + 1;
     user = new User({
       firstName,
       lastName,
@@ -35,7 +36,8 @@ exports.register = async (req, res) => {
       password,
       orgName,
       orgWebsite,
-      orgIndustry
+      orgIndustry,
+      avatar: `/avatars/avatar_${randomAvatarId}.png`
     });
 
     await user.save();
@@ -124,6 +126,13 @@ exports.login = async (req, res) => {
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Ensure user has a professional avatar
+    if (!user.avatar) {
+      const randomAvatarId = Math.floor(Math.random() * 4) + 1;
+      user.avatar = `/avatars/avatar_${randomAvatarId}.png`;
+      await user.save();
     }
 
     // 4. Generate JWT

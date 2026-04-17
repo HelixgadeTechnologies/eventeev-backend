@@ -35,11 +35,29 @@ io.on('connection', (socket) => {
   socket.on('join_room', (roomId) => {
     socket.join(roomId);
     console.log(`Socket ${socket.id} joined room ${roomId}`);
+    
+    // Track participants count and emit activation status
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const count = room ? room.size : 0;
+    io.to(roomId).emit('room_status', {
+      activated: count >= 2,
+      count: count,
+      roomId: roomId
+    });
   });
 
   socket.on('leave_room', (roomId) => {
     socket.leave(roomId);
     console.log(`Socket ${socket.id} left room ${roomId}`);
+    
+    // Update count for remaining users
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const count = room ? room.size : 0;
+    io.to(roomId).emit('room_status', {
+      activated: count >= 2,
+      count: count,
+      roomId: roomId
+    });
   });
 
   socket.on('send_message', async (data) => {
@@ -57,6 +75,23 @@ io.on('connection', (socket) => {
       io.to(room).emit('receive_message', populatedMessage);
     } catch (error) {
       console.error('Error sending message via socket:', error);
+    }
+  });
+
+  socket.on('disconnecting', () => {
+    // Before actual disconnect, we can see which rooms the socket was in
+    for (const roomId of socket.rooms) {
+      if (roomId !== socket.id) { // ignore the auto-generated room for this socket
+        const room = io.sockets.adapter.rooms.get(roomId);
+        if (room) {
+          const count = room.size - 1; // current size including this socket which is about to leave
+          io.to(roomId).emit('room_status', {
+            activated: count >= 2,
+            count: count,
+            roomId: roomId
+          });
+        }
+      }
     }
   });
 

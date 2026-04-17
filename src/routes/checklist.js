@@ -110,4 +110,28 @@ router.post('/bulk', auth, checklistController.createBulkItems);
 router.patch('/:id', auth, checklistController.updateChecklistItem);
 router.delete('/:id', auth, checklistController.deleteChecklistItem);
 
+/**
+ * @openapi
+ * /api/checklist/initialize:
+ *   post:
+ *     tags: [Checklist]
+ *     summary: Initialize checklist from a template
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [eventId, templateType]
+ *             properties:
+ *               eventId: { type: string }
+ *               templateType: { type: string, enum: [conference, concert, party, wedding, default] }
+ *     responses:
+ *       201:
+ *         description: Checklist initialized
+ */
+router.post('/initialize', auth, checklistController.initializeChecklist);
+
 module.exports = router;
