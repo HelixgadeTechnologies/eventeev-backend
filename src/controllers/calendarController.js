@@ -37,7 +37,7 @@ exports.createCalendarEvent = async (req, res) => {
       website,
       category,
       type,
-      owner: req.user.id
+      owner: req.user ? req.user.id : null
     });
 
     await calendarEvent.save();

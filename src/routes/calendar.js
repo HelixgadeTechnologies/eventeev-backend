@@ -19,13 +19,10 @@ router.get('/', calendarController.getCalendarEvents);
  * /api/calendar:
  *   post:
  *     tags: [Calendar]
- *     summary: Submit a new calendar event
- *     security:
- *       - bearerAuth: []
+ *     summary: Submit a new calendar event (Public)
  */
 router.post(
   '/',
-  auth,
   [
     check('title', 'Title is required').not().isEmpty(),
     check('startDate', 'Start date is required').isISO8601(),
