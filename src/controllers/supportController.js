@@ -17,6 +17,15 @@ exports.handleContactForm = async (req, res) => {
       });
     }
 
+    // Check if email credentials are set
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASS) {
+      console.error('[SUPPORT ERROR] EMAIL_USER or EMAIL_APP_PASS not configured in environment.');
+      return res.status(500).json({
+        success: false,
+        message: 'Email service is currently unavailable. Please try again later.'
+      });
+    }
+
     const adminEmail = 'weareeventeev@gmail.com';
     const primaryColor = '#FF6B00';
     const darkBg = '#101828';
@@ -65,15 +74,7 @@ exports.handleContactForm = async (req, res) => {
 </html>
     `;
 
-    // Send email to admin
-    await sendEmail({
-      email: adminEmail,
-      subject: `[Contact Form] ${subject}: from ${name}`,
-      message: `You have a new contact inquiry from ${name} (${email}).\n\nSubject: ${subject}\n\nMessage:\n${message}`,
-      html: adminEmailHtml
-    });
-
-    // Optional: Send auto-reply to user
+    // User Auto-reply Email
     const userEmailHtml = `
 <!DOCTYPE html>
 <html>
@@ -104,12 +105,34 @@ exports.handleContactForm = async (req, res) => {
 </html>
     `;
 
-    await sendEmail({
-      email: email,
-      subject: `We've received your message - Eventeev`,
-      message: `Hi ${name}, thank you for reaching out to Eventeev! We've received your message and our team will get back to you as soon as possible.`,
-      html: userEmailHtml
+    // Send both emails using Promise.allSettled to prevent one failure from blocking the entire response
+    // However, we still want to ensure the admin gets the email most importantly
+    const results = await Promise.allSettled([
+      sendEmail({
+        email: adminEmail,
+        subject: `[Contact Form] ${subject}: from ${name}`,
+        message: `You have a new contact inquiry from ${name} (${email}).\n\nSubject: ${subject}\n\nMessage:\n${message}`,
+        html: adminEmailHtml
+      }),
+      sendEmail({
+        email: email,
+        subject: `We've received your message - Eventeev`,
+        message: `Hi ${name}, thank you for reaching out to Eventeev! We've received your message and our team will get back to you as soon as possible.`,
+        html: userEmailHtml
+      })
+    ]);
+
+    // Check results for logging
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`[SUPPORT ERROR] Failed to send ${index === 0 ? 'Admin' : 'User'} email:`, result.reason);
+      }
     });
+
+    // If both failed, we consider it a 500
+    if (results[0].status === 'rejected' && results[1].status === 'rejected') {
+      throw new Error('Both email transmissions failed');
+    }
 
     res.status(200).json({
       success: true,
@@ -117,7 +140,7 @@ exports.handleContactForm = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Contact Form Error:', error);
+    console.error('Contact Form Final Error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to send message. Please try again later.'
