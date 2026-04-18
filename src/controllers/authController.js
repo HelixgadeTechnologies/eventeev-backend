@@ -37,7 +37,8 @@ exports.register = async (req, res) => {
       orgName,
       orgWebsite,
       orgIndustry,
-      avatar: `/avatars/avatar_${randomAvatarId}.png`
+      avatar: `/avatars/avatar_${randomAvatarId}.png`,
+      role: 'user' // Explicitly set to user
     });
 
     await user.save();
@@ -46,7 +47,8 @@ exports.register = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     };
 
@@ -84,7 +86,8 @@ exports.register = async (req, res) => {
             id: user.id,
             firstName: user.firstName,
             lastName: user.lastName,
-            email: user.email
+            email: user.email,
+            role: user.role
           }
         });
       }
@@ -139,7 +142,8 @@ exports.login = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     };
 
@@ -166,7 +170,8 @@ exports.login = async (req, res) => {
             id: user.id,
             email: user.email,
             firstName: user.firstName,
-            lastName: user.lastName
+            lastName: user.lastName,
+            role: user.role
           }
         });
       }
