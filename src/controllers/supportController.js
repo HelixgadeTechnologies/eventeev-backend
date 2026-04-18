@@ -19,7 +19,9 @@ exports.handleContactForm = async (req, res) => {
 
     // Check if email credentials are set
     if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASS) {
-      console.error('[SUPPORT ERROR] EMAIL_USER or EMAIL_APP_PASS not configured in environment.');
+      if (!process.env.EMAIL_USER) console.error('[SUPPORT ERROR] EMAIL_USER not configured in environment.');
+      if (!process.env.EMAIL_APP_PASS) console.error('[SUPPORT ERROR] EMAIL_APP_PASS not configured in environment.');
+      
       return res.status(500).json({
         success: false,
         message: 'Email service is currently unavailable. Please try again later.'

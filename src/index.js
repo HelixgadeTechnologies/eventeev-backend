@@ -13,7 +13,7 @@ connectDB();
 startEventStatusTask();
 
 // Validate critical environment variables
-const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'JWT_EXPIRES_IN'];
+const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'JWT_EXPIRES_IN', 'EMAIL_USER', 'EMAIL_APP_PASS'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
