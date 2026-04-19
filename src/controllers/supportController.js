@@ -42,6 +42,7 @@ exports.handleContactForm = async (req, res) => {
     body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #1D2939; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 20px auto; border: 1px solid #EAECF0; border-radius: 12px; overflow: hidden; }
     .header { background-color: ${darkBg}; padding: 40px; text-align: center; color: white; }
+    .logo-img { height: 28px; margin-bottom: 20px; }
     .content { padding: 40px; }
     .field { margin-bottom: 24px; }
     .label { font-size: 12px; font-weight: 600; color: #667085; text-transform: uppercase; margin-bottom: 4px; }
@@ -52,6 +53,7 @@ exports.handleContactForm = async (req, res) => {
 <body>
   <div class="container">
     <div class="header">
+      <img src="https://eventeev.vercel.app/logo-white.svg" alt="eventeev" class="logo-img" />
       <h1 style="margin:0; font-size: 24px;">New Contact Inquiry</h1>
     </div>
     <div class="content">
@@ -86,12 +88,16 @@ exports.handleContactForm = async (req, res) => {
     .container { max-width: 600px; margin: 20px auto; border: 1px solid #EAECF0; border-radius: 12px; overflow: hidden; }
     .header { background-color: ${primaryColor}; padding: 40px; text-align: center; color: white; }
     .content { padding: 40px; }
-    .footer { padding: 20px; text-align: center; font-size: 12px; color: #98A2B3; background: #F9FAFB; }
+    .footer { padding: 40px 20px; text-align: center; font-size: 12px; color: #98A2B3; background: #F9FAFB; border-top: 1px solid #EAECF0; }
+    .social-links { margin-bottom: 20px; }
+    .social-icon { display: inline-block; margin: 0 10px; text-decoration: none; }
+    .social-img { width: 24px; height: 24px; opacity: 0.5; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      <img src="https://eventeev.vercel.app/logo-white.svg" alt="eventeev" height="32" style="margin-bottom: 20px;" />
       <h1 style="margin:0; font-size: 24px;">We've Received Your Message</h1>
     </div>
     <div class="content">
@@ -100,6 +106,21 @@ exports.handleContactForm = async (req, res) => {
       <p>Best regards,<br>The Eventeev Team</p>
     </div>
     <div class="footer">
+      <div class="social-links">
+        <a href="https://instagram.com/weareeventeev" class="social-icon">
+          <img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" alt="Instagram" class="social-img" />
+        </a>
+        <a href="https://twitter.com/weareeventeev" class="social-icon">
+          <img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" alt="X" class="social-img" />
+        </a>
+        <a href="https://facebook.com/weareeventeev" class="social-icon">
+          <img src="https://cdn-icons-png.flaticon.com/512/174/174848.png" alt="Facebook" class="social-img" />
+        </a>
+        <a href="https://linkedin.com/company/weareeventeev" class="social-icon">
+          <img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" alt="LinkedIn" class="social-img" />
+        </a>
+      </div>
+      <p style="margin-bottom: 10px;">Follow us <a href="https://instagram.com/weareeventeev" style="color: ${primaryColor}; text-decoration: none; font-weight: 600;">@weareeventeev</a></p>
       &copy; 2026 Eventeev Technologies Inc.
     </div>
   </div>
