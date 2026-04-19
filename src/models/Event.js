@@ -147,7 +147,8 @@ const EventSchema = new mongoose.Schema({
 
 // Create event slug from the title
 EventSchema.pre('save', async function () {
-  if (!this.isModified('title')) {
+  // Generate slug if title is modified OR slug is missing
+  if (!this.isModified('title') && this.slug) {
     return;
   }
 
