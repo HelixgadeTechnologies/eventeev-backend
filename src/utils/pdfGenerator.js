@@ -158,7 +158,7 @@ const generateTicketPDF = async (data) => {
         .fillColor(primaryColor)
         .font('Helvetica-Bold')
         .text('Terms & Conditions', 400, 740, {
-          link: 'https://eventeev.vercel.app/terms',
+          link: 'https://eventeev.com/terms',
           underline: true
         });
 

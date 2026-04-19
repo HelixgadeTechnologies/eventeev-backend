@@ -57,7 +57,7 @@ const generateRegistrationEmail = ({ name, event, ticketType, orderId, qrCodeUrl
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://eventeev.vercel.app/logo-white.svg" alt="eventeev" class="logo-img" />
+      <img src="https://eventeev.com/logo-white.svg" alt="eventeev" class="logo-img" />
       <h1 class="hero-title">${event.title} Registration Confirmed</h1>
       <p class="hero-subtitle">${eventDate} • ${event.location || 'Online Event'}</p>
     </div>

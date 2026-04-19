@@ -53,7 +53,7 @@ exports.handleContactForm = async (req, res) => {
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://eventeev.vercel.app/logo-white.svg" alt="eventeev" class="logo-img" />
+      <img src="https://eventeev.com/logo-white.svg" alt="eventeev" class="logo-img" />
       <h1 style="margin:0; font-size: 24px;">New Contact Inquiry</h1>
     </div>
     <div class="content">
@@ -97,7 +97,7 @@ exports.handleContactForm = async (req, res) => {
 <body>
   <div class="container">
     <div class="header">
-      <img src="https://eventeev.vercel.app/logo-white.svg" alt="eventeev" height="32" style="margin-bottom: 20px;" />
+      <img src="https://eventeev.com/logo-white.svg" alt="eventeev" height="32" style="margin-bottom: 20px;" />
       <h1 style="margin:0; font-size: 24px;">We've Received Your Message</h1>
     </div>
     <div class="content">

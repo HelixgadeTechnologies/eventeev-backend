@@ -31,7 +31,7 @@ const getWelcomeEmailHtml = (firstName) => `
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <img src="https://eventeev.vercel.app/logo-black.svg" alt="eventeev" height="28" style="display:block; border:0; outline:none;" />
+                  <img src="https://eventeev.com/logo-black.svg" alt="eventeev" height="28" style="display:block; border:0; outline:none;" />
                 </td>
                 <td align="right">
                   <span style="font-size:11px; font-weight:600; color:#9CA3AF; letter-spacing:1px; text-transform:uppercase;">Welcome Email</span>
@@ -223,7 +223,7 @@ const getWelcomeEmailHtml = (firstName) => `
         <!-- ── CTA BUTTON ── -->
         <tr>
           <td style="padding: 0 40px 48px; text-align:center;">
-            <a href="https://eventeev.vercel.app/events" style="display:inline-block; background:linear-gradient(135deg,#EB5017,#D44210); color:white; text-decoration:none; font-size:15px; font-weight:800; padding:17px 48px; border-radius:100px; letter-spacing:0.2px; box-shadow: 0 8px 24px rgba(235,80,23,0.35);">
+            <a href="https://eventeev.com/events" style="display:inline-block; background:linear-gradient(135deg,#EB5017,#D44210); color:white; text-decoration:none; font-size:15px; font-weight:800; padding:17px 48px; border-radius:100px; letter-spacing:0.2px; box-shadow: 0 8px 24px rgba(235,80,23,0.35);">
               Go to Dashboard &rarr;
             </a>
             <p style="font-size:12px; color:#9CA3AF; margin-top:16px; font-weight:500;">
@@ -245,7 +245,7 @@ const getWelcomeEmailHtml = (firstName) => `
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <img src="https://eventeev.vercel.app/logo-black.svg" alt="eventeev" height="22" style="display:block; border:0; outline:none;" />
+                  <img src="https://eventeev.com/logo-black.svg" alt="eventeev" height="22" style="display:block; border:0; outline:none;" />
                   <p style="font-size:11px; color:#9CA3AF; margin-top:4px; font-weight:500; line-height:1.5;">
                     Making events unforgettable, one platform at a time.<br>
                     Lagos, Nigeria &bull; hello@eventeev.com
@@ -282,9 +282,9 @@ const getWelcomeEmailHtml = (firstName) => `
                   <p style="font-size:11px; color:#9CA3AF; font-weight:500;">
                     <a href="#" style="color:#9CA3AF; text-decoration:none;">Unsubscribe</a>
                     &nbsp;&bull;&nbsp;
-                    <a href="https://eventeev.vercel.app/privacy" style="color:#9CA3AF; text-decoration:none;">Privacy Policy</a>
+                    <a href="https://eventeev.com/privacy" style="color:#9CA3AF; text-decoration:none;">Privacy Policy</a>
                     &nbsp;&bull;&nbsp;
-                    <a href="https://eventeev.vercel.app/help" style="color:#9CA3AF; text-decoration:none;">Help Center</a>
+                    <a href="https://eventeev.com/help" style="color:#9CA3AF; text-decoration:none;">Help Center</a>
                   </p>
                   <p style="font-size:10px; color:#D1D5DB; margin-top:8px; font-weight:500;">
                     &copy; ${new Date().getFullYear()} eventeev. All rights reserved.
