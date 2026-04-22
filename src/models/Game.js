@@ -63,6 +63,8 @@ const mongoose = require('mongoose');
  *           type: string
  *         description:
  *           type: string
+ *         category:
+ *           type: string
  *         questions:
  *           type: array
  *           items:
@@ -181,6 +183,9 @@ const QuizSchema = new mongoose.Schema({
     required: true,
   },
   description: {
+    type: String,
+  },
+  category: {
     type: String,
   },
   questions: [
