@@ -45,7 +45,7 @@ exports.register = async (req, res) => {
 
     // 4. Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const otpExpire = Date.now() + 20 * 60 * 1000; // 20 minutes
 
     user.otpCode = crypto.createHash('sha256').update(otp).digest('hex');
     user.otpExpire = otpExpire;
@@ -56,7 +56,7 @@ exports.register = async (req, res) => {
       await sendEmail({
         email: user.email,
         subject: 'Verify your Eventeev account',
-        message: `Your verification code is ${otp}. It expires in 10 minutes.`,
+        message: `Your verification code is ${otp}. It expires in 20 minutes.`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
             <h2 style="color: #1B1818; text-align: center;">Verify Your Account</h2>
@@ -65,7 +65,7 @@ exports.register = async (req, res) => {
             <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; border-radius: 5px; color: #eb5017;">
               ${otp}
             </div>
-            <p style="font-size: 14px; color: #666;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+            <p style="font-size: 14px; color: #666;">This code will expire in 20 minutes. If you did not request this, please ignore this email.</p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
             <p style="font-size: 12px; color: #999; text-align: center;">&copy; 2024 Eventeev. All rights reserved.</p>
           </div>
@@ -73,7 +73,11 @@ exports.register = async (req, res) => {
       });
     } catch (emailErr) {
       console.error('[Registration] OTP email sending error:', emailErr);
-      // We still return success but maybe indicate email failed in logs
+      // Delete the created user so they can try again
+      await User.findByIdAndDelete(user.id);
+      return res.status(500).json({ 
+        message: 'Registration failed: Could not send verification email. Please check your email address or try again later.' 
+      });
     }
 
     // 6. Successful Response (No JWT yet, as they need to verify OTP)
@@ -175,7 +179,7 @@ exports.resendOtp = async (req, res) => {
 
     // Generate new OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpire = Date.now() + 10 * 60 * 1000;
+    const otpExpire = Date.now() + 20 * 60 * 1000; // 20 minutes
 
     user.otpCode = crypto.createHash('sha256').update(otp).digest('hex');
     user.otpExpire = otpExpire;
@@ -185,7 +189,7 @@ exports.resendOtp = async (req, res) => {
     await sendEmail({
       email: user.email,
       subject: 'Your new verification code',
-      message: `Your new verification code is ${otp}. It expires in 10 minutes.`,
+      message: `Your new verification code is ${otp}. It expires in 20 minutes.`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
           <h2 style="color: #1B1818; text-align: center;">New Verification Code</h2>
@@ -194,7 +198,7 @@ exports.resendOtp = async (req, res) => {
           <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; border-radius: 5px; color: #eb5017;">
             ${otp}
           </div>
-          <p style="font-size: 14px; color: #666;">This code will expire in 10 minutes.</p>
+          <p style="font-size: 14px; color: #666;">This code will expire in 20 minutes.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
           <p style="font-size: 12px; color: #999; text-align: center;">&copy; 2024 Eventeev. All rights reserved.</p>
         </div>
