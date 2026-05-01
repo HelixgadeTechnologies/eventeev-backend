@@ -17,9 +17,14 @@ const sendEmail = async (options) => {
     html: options.html,
   };
 
-  const info = await transporter.sendMail(message);
-
-  console.log('Message sent: %s', info.messageId);
+  try {
+    const info = await transporter.sendMail(message);
+    console.log(`[Email] Success: Message sent to ${options.email}. ID: ${info.messageId}`);
+  } catch (error) {
+    console.error(`[Email] Critical Failure: Could not send email to ${options.email}`);
+    console.error(`[Email] Error details:`, error.message);
+    throw error; // Rethrow to be caught by the caller (authController)
+  }
 };
 
 module.exports = sendEmail;

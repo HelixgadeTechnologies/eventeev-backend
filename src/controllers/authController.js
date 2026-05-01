@@ -52,6 +52,7 @@ exports.register = async (req, res) => {
     await user.save();
 
     // 5. Send OTP Email
+    console.log(`[Registration] Attempting to send OTP email to: ${user.email}`);
     try {
       await sendEmail({
         email: user.email,
@@ -71,6 +72,7 @@ exports.register = async (req, res) => {
           </div>
         `
       });
+      console.log(`[Registration] OTP email sent successfully to: ${user.email}`);
     } catch (emailErr) {
       console.error('[Registration] OTP email sending error:', emailErr);
       // Delete the created user so they can try again
@@ -186,6 +188,7 @@ exports.resendOtp = async (req, res) => {
     await user.save();
 
     // Send Email
+    console.log(`[Resend OTP] Attempting to send new OTP email to: ${user.email}`);
     await sendEmail({
       email: user.email,
       subject: 'Your new verification code',
@@ -204,6 +207,7 @@ exports.resendOtp = async (req, res) => {
         </div>
       `
     });
+    console.log(`[Resend OTP] New OTP email sent successfully to: ${user.email}`);
 
     res.json({ message: 'New OTP sent successfully' });
   } catch (error) {
