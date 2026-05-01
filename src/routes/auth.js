@@ -34,6 +34,51 @@ router.post(
 
 /**
  * @openapi
+ * /api/auth/verify-otp:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Verify account with OTP
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, otp]
+ *             properties:
+ *               email: { type: string }
+ *               otp: { type: string }
+ *     responses:
+ *       200:
+ *         description: Account verified
+ *       400:
+ *         description: Invalid OTP
+ */
+router.post('/verify-otp', authController.verifyOtp);
+
+/**
+ * @openapi
+ * /api/auth/resend-otp:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Resend OTP
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string }
+ *     responses:
+ *       200:
+ *         description: OTP resent
+ */
+router.post('/resend-otp', authController.resendOtp);
+
+/**
+ * @openapi
  * /api/auth/login:
  *   post:
  *     tags: [Auth]

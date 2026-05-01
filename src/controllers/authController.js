@@ -43,7 +43,89 @@ exports.register = async (req, res) => {
 
     await user.save();
 
-    // 4. Generate JWT
+    // 4. Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    user.otpCode = crypto.createHash('sha256').update(otp).digest('hex');
+    user.otpExpire = otpExpire;
+    await user.save();
+
+    // 5. Send OTP Email
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: 'Verify your Eventeev account',
+        message: `Your verification code is ${otp}. It expires in 10 minutes.`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+            <h2 style="color: #1B1818; text-align: center;">Verify Your Account</h2>
+            <p style="font-size: 16px; color: #333;">Hi ${user.firstName},</p>
+            <p style="font-size: 16px; color: #333;">Thank you for signing up for Eventeev! Please use the following 6-digit code to verify your account:</p>
+            <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; border-radius: 5px; color: #eb5017;">
+              ${otp}
+            </div>
+            <p style="font-size: 14px; color: #666;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="font-size: 12px; color: #999; text-align: center;">&copy; 2024 Eventeev. All rights reserved.</p>
+          </div>
+        `
+      });
+    } catch (emailErr) {
+      console.error('[Registration] OTP email sending error:', emailErr);
+      // We still return success but maybe indicate email failed in logs
+    }
+
+    // 6. Successful Response (No JWT yet, as they need to verify OTP)
+    res.status(201).json({
+      message: 'Registration successful. Please verify your email with the OTP sent.',
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email
+      }
+    });
+
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Verify OTP
+ * @route   POST /api/auth/verify-otp
+ * @access  Public
+ */
+exports.verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if already verified
+    if (user.isVerified) {
+      return res.status(400).json({ message: 'User is already verified' });
+    }
+
+    // Verify OTP
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+    
+    if (user.otpCode !== hashedOtp || user.otpExpire < Date.now()) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    // Clear OTP fields and set verified
+    user.isVerified = true;
+    user.otpCode = undefined;
+    user.otpExpire = undefined;
+    await user.save();
+
+    // Generate JWT now that they are verified
     const payload = {
       user: {
         id: user.id,
@@ -52,47 +134,74 @@ exports.register = async (req, res) => {
       }
     };
 
-    if (!process.env.JWT_SECRET) {
-      console.error('[Registration] CRITICAL: JWT_SECRET environment variable is missing.');
-      return res.status(500).send('Server Error: Authentication configuration missing');
-    }
-
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
-      async (err, token) => {
-        if (err) {
-          console.error('[Registration] JWT signing error:', err);
-          return res.status(500).send('Server Error');
-        }
-
-        try {
-          await sendEmail({
-            email: user.email,
-            subject: `Welcome to eventeev, ${user.firstName}! Let's get your event live 🚀`,
-            message: `Hi ${user.firstName}, welcome to the eventeev family! Head to your dashboard to create your first event, customize your registration forms, and explore our real-time analytics tools. Pro Tip: Events with a detailed description and a high-quality banner image see a 30% higher registration rate!`,
-            html: getWelcomeEmailHtml(user.firstName)
-          });
-        } catch (emailErr) {
-          console.error('[Registration] Welcome email sending error:', emailErr);
-        }
-        
-        // 5. Successful Response
-        res.status(201).json({
-          message: 'Registration successful',
+      (err, token) => {
+        if (err) throw err;
+        res.json({
+          message: 'OTP verified successfully',
           token,
           user: {
             id: user.id,
+            email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            email: user.email,
             role: user.role
           }
         });
       }
     );
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
 
+/**
+ * @desc    Resend OTP
+ * @route   POST /api/auth/resend-otp
+ * @access  Public
+ */
+exports.resendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpire = Date.now() + 10 * 60 * 1000;
+
+    user.otpCode = crypto.createHash('sha256').update(otp).digest('hex');
+    user.otpExpire = otpExpire;
+    await user.save();
+
+    // Send Email
+    await sendEmail({
+      email: user.email,
+      subject: 'Your new verification code',
+      message: `Your new verification code is ${otp}. It expires in 10 minutes.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <h2 style="color: #1B1818; text-align: center;">New Verification Code</h2>
+          <p style="font-size: 16px; color: #333;">Hi ${user.firstName},</p>
+          <p style="font-size: 16px; color: #333;">As requested, here is your new 6-digit code to verify your account:</p>
+          <div style="background-color: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; border-radius: 5px; color: #eb5017;">
+            ${otp}
+          </div>
+          <p style="font-size: 14px; color: #666;">This code will expire in 10 minutes.</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="font-size: 12px; color: #999; text-align: center;">&copy; 2024 Eventeev. All rights reserved.</p>
+        </div>
+      `
+    });
+
+    res.json({ message: 'New OTP sent successfully' });
   } catch (error) {
     console.error(error.message);
     res.status(500).send('Server Error');
