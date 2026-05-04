@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 
@@ -12,8 +13,37 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+
+// Restrict CORS to specific frontend origin
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || '*', // Fallback to all for now if env is missing, but env should have it
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
 app.use(morgan("dev"));
+
+// Global Rate Limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: { error: "Too many requests from this IP, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalLimiter);
+
+// Specific Rate Limiting for Auth
+const authLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 10, // Limit each IP to 10 attempts per 10 mins
+  message: { message: "Too many login attempts, please try again after 10 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgotpassword', authLimiter);
 app.use(express.json());
 app.use(express.static('public'));
 

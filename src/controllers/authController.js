@@ -239,25 +239,50 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // 3. Verify password
+    // 3. Check if account is locked
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingMinutes = Math.ceil((user.lockUntil - Date.now()) / (60 * 1000));
+      return res.status(403).json({ 
+        message: `Account is temporarily locked. Please try again in ${remainingMinutes} minutes.` 
+      });
+    }
+
+    // 4. Verify password
     if (!user.password) {
-      console.warn(`[Login] Login attempt for user ${email} failed: No password set (possibly waitlisted user).`);
+      console.warn(`[Login] Login attempt for user ${email} failed: No password set.`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const isMatch = await user.matchPassword(password);
+    
     if (!isMatch) {
+      // Increment failed attempts
+      user.loginAttempts += 1;
+      
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = Date.now() + 60 * 60 * 1000; // Lock for 1 hour
+        await user.save();
+        return res.status(403).json({ 
+          message: 'Account locked due to too many failed attempts. Please try again in 1 hour.' 
+        });
+      }
+      
+      await user.save();
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // 5. Successful Login - Reset attempts
+    user.loginAttempts = 0;
+    user.lockUntil = undefined;
+    
     // Ensure user has a professional avatar
     if (!user.avatar) {
       const randomAvatarId = Math.floor(Math.random() * 4) + 1;
       user.avatar = `/avatars/avatar_${randomAvatarId}.png`;
-      await user.save();
     }
+    await user.save();
 
-    // 4. Generate JWT
+    // 6. Generate JWT
     const payload = {
       user: {
         id: user.id,
@@ -281,7 +306,7 @@ exports.login = async (req, res) => {
           return res.status(500).send('Server Error');
         }
         
-        // 5. Successful Response
+        // 7. Successful Response
         res.json({
           message: 'Auth Successful',
           token,
