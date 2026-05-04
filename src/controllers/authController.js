@@ -78,7 +78,9 @@ exports.register = async (req, res) => {
       // Delete the created user so they can try again
       await User.findByIdAndDelete(user.id);
       return res.status(500).json({ 
-        message: 'Registration failed: Could not send verification email. Please check your email address or try again later.' 
+        message: 'Registration failed: Could not send verification email.',
+        error: emailErr.message,
+        details: emailErr.code
       });
     }
 
@@ -349,7 +351,11 @@ exports.forgotPassword = async (req, res) => {
 
       await user.save({ validateBeforeSave: false });
 
-      return res.status(500).json({ message: 'Email could not be sent' });
+      return res.status(500).json({ 
+        message: 'Email could not be sent',
+        error: err.message,
+        details: err.code
+      });
     }
   } catch (error) {
     console.error(error);
