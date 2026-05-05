@@ -79,7 +79,31 @@ router.post('/resend-otp', authController.resendOtp);
 
 /**
  * @openapi
+ * /api/auth/google:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Google Login/Signup
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [idToken]
+ *             properties:
+ *               idToken: { type: string }
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid token
+ */
+router.post('/google', authController.googleLogin);
+
+/**
+ * @openapi
  * /api/auth/login:
+
  *   post:
  *     tags: [Auth]
  *     summary: Login user

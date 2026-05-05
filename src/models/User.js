@@ -72,9 +72,10 @@ const UserSchema = new mongoose.Schema({
   password: {
     type: String,
     required: function() {
-      // Password is only required if NOT waitlisted
-      return !this.isWaitlisted;
+      // Password is only required if NOT waitlisted AND NOT a Google user
+      return !this.isWaitlisted && !this.googleId;
     },
+
     minlength: 6,
     select: false,
   },
@@ -128,6 +129,11 @@ const UserSchema = new mongoose.Schema({
   otpExpire: {
     type: Date,
   },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
   loginAttempts: {
     type: Number,
     required: true,
@@ -137,6 +143,7 @@ const UserSchema = new mongoose.Schema({
     type: Date,
   },
 });
+
 
 // Encrypt password using bcrypt
 UserSchema.pre('save', async function () {

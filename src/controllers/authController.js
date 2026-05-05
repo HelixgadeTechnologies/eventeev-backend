@@ -1,5 +1,8 @@
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const bcrypt = require('bcryptjs');
+
 const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
@@ -536,3 +539,82 @@ exports.waitlist = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Google Login/Signup
+ * @route   POST /api/auth/google
+ * @access  Public
+ */
+exports.googleLogin = async (req, res) => {
+  const { idToken } = req.body;
+
+  try {
+    // 1. Verify Google ID Token
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, given_name: firstName, family_name: lastName, picture: avatar } = payload;
+
+    // 2. Find user by email (primary key for account linking)
+    let user = await User.findOne({ email });
+
+    if (user) {
+      // User exists, link Google ID if not already linked
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.isVerified = true; // Google accounts are verified
+        await user.save();
+      }
+    } else {
+      // 3. Signup - New User
+      user = new User({
+        firstName,
+        lastName,
+        email,
+        googleId,
+        avatar,
+        isVerified: true, // Google accounts are verified
+        role: 'user'
+      });
+      await user.save();
+    }
+
+    // 4. Generate JWT
+    const jwtPayload = {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      }
+    };
+
+    jwt.sign(
+      jwtPayload,
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
+      (err, token) => {
+        if (err) throw err;
+        res.json({
+          message: 'Google Auth Successful',
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            avatar: user.avatar
+          }
+        });
+      }
+    );
+
+  } catch (error) {
+    console.error('[Google Auth] Verification Error:', error);
+    res.status(401).json({ message: 'Invalid Google token' });
+  }
+};
+
