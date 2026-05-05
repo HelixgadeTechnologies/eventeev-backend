@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const ticketController = require('../controllers/ticketController');
+const auth = require('../middleware/auth');
+
 
 /**
  * @openapi
@@ -18,7 +20,7 @@ const ticketController = require('../controllers/ticketController');
  *       201:
  *         description: Ticket created
  */
-router.post('/create', ticketController.createTicket);
+router.post('/create', auth, ticketController.createTicket);
 
 /**
  * @openapi
@@ -42,7 +44,7 @@ router.post('/create', ticketController.createTicket);
  *       200:
  *         description: Ticket updated
  */
-router.put('/edit/:id', ticketController.editTicket);
+router.put('/edit/:id', auth, ticketController.editTicket);
 
 /**
  * @openapi
@@ -84,7 +86,7 @@ router.get('/event/:eventId', ticketController.getTicketsByEvent);
  *       200:
  *         description: Ticket deleted
  */
-router.delete('/:id', ticketController.deleteTicket);
+router.delete('/:id', auth, ticketController.deleteTicket);
 
 /**
  * @openapi
@@ -110,7 +112,7 @@ router.delete('/:id', ticketController.deleteTicket);
  *       200:
  *         description: Status updated
  */
-router.patch('/:id/status', ticketController.updateTicketStatus);
+router.patch('/:id/status', auth, ticketController.updateTicketStatus);
 
 /**
  * @openapi
@@ -128,6 +130,6 @@ router.patch('/:id/status', ticketController.updateTicketStatus);
  *       200:
  *         description: Success
  */
-router.get('/attendees/:ticketId', ticketController.getAttendeesByTicket);
+router.get('/attendees/:ticketId', auth, ticketController.getAttendeesByTicket);
 
 module.exports = router;

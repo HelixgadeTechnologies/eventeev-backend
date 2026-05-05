@@ -157,8 +157,10 @@ exports.getEventListing = async (req, res) => {
  */
 exports.getDrafts = async (req, res) => {
   try {
-    const events = await Event.find({ status: 'Draft' });
+    const events = await Event.find({ owner: req.user.id, status: 'Draft' });
+
     res.json(events);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -171,8 +173,10 @@ exports.getDrafts = async (req, res) => {
  */
 exports.getCompletedEvents = async (req, res) => {
   try {
-    const events = await Event.find({ status: 'Completed' });
+    const events = await Event.find({ owner: req.user.id, status: 'Completed' });
+
     res.json(events);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -258,9 +262,17 @@ exports.publishEvent = async (req, res) => {
 exports.draftToLive = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
+
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    
+    // Check ownership
+    if (event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to modify this event' });
+    }
+
     event.status = 'Published';
     await event.save();
+
     
     // Create General Lobby room for the event
     await ensureGeneralLobby(event._id);
@@ -278,12 +290,21 @@ exports.draftToLive = async (req, res) => {
  */
 exports.deleteEvent = async (req, res) => {
   try {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    // Check ownership
+    if (event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to delete this event' });
+    }
+
     await Event.findByIdAndDelete(req.params.id);
     res.json({ message: 'Event removed' });
   } catch (error) {
     res.status(500).send('Server Error');
   }
 };
+
 /**
  * @desc    Update event
  * @route   PUT /api/event/:id
@@ -292,8 +313,14 @@ exports.deleteEvent = async (req, res) => {
 exports.updateEvent = async (req, res) => {
   try {
     let event = await Event.findById(req.params.id);
+
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Check ownership
+    if (event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update this event' });
     }
 
     // Update event
@@ -302,6 +329,7 @@ exports.updateEvent = async (req, res) => {
       { $set: req.body },
       { new: true, runValidators: true }
     );
+
 
     res.json(event);
   } catch (error) {

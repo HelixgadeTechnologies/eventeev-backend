@@ -9,8 +9,16 @@ const CHECKLIST_TEMPLATES = require('../utils/checklistTemplates');
  */
 exports.getEventChecklist = async (req, res) => {
   try {
+    // Check ownership
+
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this event\'s checklist' });
+    }
+
     const checklist = await Checklist.find({ event: req.params.eventId }).sort({ createdAt: 1 });
     res.json(checklist);
+
   } catch (error) {
     console.error(error.message);
     res.status(500).send('Server Error');

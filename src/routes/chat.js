@@ -44,7 +44,7 @@ router.post('/room', auth, chatController.createRoom);
  *               items:
  *                 $ref: '#/components/schemas/Room'
  */
-router.get('/rooms/:eventId', chatController.getRooms);
+router.get('/rooms/:eventId', auth, chatController.getRooms);
 
 /**
  * @openapi
@@ -67,6 +67,6 @@ router.get('/rooms/:eventId', chatController.getRooms);
  *               items:
  *                 $ref: '#/components/schemas/Message'
  */
-router.get('/messages/:roomId', chatController.getMessages);
+router.get('/messages/:roomId', auth, chatController.getMessages);
 
 module.exports = router;

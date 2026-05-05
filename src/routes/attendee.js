@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const attendeeController = require('../controllers/attendeeController');
+const auth = require('../middleware/auth');
+
 
 /**
  * @openapi
@@ -24,7 +26,7 @@ const attendeeController = require('../controllers/attendeeController');
  *               items:
  *                 $ref: '#/components/schemas/Attendee'
  */
-router.get('/event/:eventId', attendeeController.getAttendeesByEvent);
+router.get('/event/:eventId', auth, attendeeController.getAttendeesByEvent);
 
 /**
  * @openapi
@@ -42,7 +44,7 @@ router.get('/event/:eventId', attendeeController.getAttendeesByEvent);
  *       200:
  *         description: Success
  */
-router.get('/event/:eventId/stats', attendeeController.getAttendeeStats);
+router.get('/event/:eventId/stats', auth, attendeeController.getAttendeeStats);
 
 /**
  * @openapi
@@ -60,7 +62,7 @@ router.get('/event/:eventId/stats', attendeeController.getAttendeeStats);
  *       200:
  *         description: Check-in successful
  */
-router.patch('/:id/check-in', attendeeController.checkInAttendee);
+router.patch('/:id/check-in', auth, attendeeController.checkInAttendee);
 
 /**
  * @openapi
@@ -78,7 +80,7 @@ router.patch('/:id/check-in', attendeeController.checkInAttendee);
  *       201:
  *         description: Attendee created
  */
-router.post('/create', attendeeController.createAttendee);
+router.post('/create', auth, attendeeController.createAttendee);
 
 /**
  * @openapi
@@ -96,7 +98,7 @@ router.post('/create', attendeeController.createAttendee);
  *       200:
  *         description: Attendee deleted
  */
-router.delete('/:id', attendeeController.deleteAttendee);
+router.delete('/:id', auth, attendeeController.deleteAttendee);
 
 /**
  * @openapi

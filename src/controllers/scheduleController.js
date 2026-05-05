@@ -1,4 +1,6 @@
 const Schedule = require('../models/Schedule');
+const Event = require('../models/Event');
+
 
 /**
  * @desc    Create a new schedule item
@@ -8,7 +10,14 @@ const Schedule = require('../models/Schedule');
 exports.createScheduleItem = async (req, res) => {
   const { event, startTime, endTime, title, type, description, speakers } = req.body;
   try {
+    // Check ownership
+    const eventObj = await Event.findById(event);
+    if (!eventObj || eventObj.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to create schedule items for this event' });
+    }
+
     const scheduleItem = new Schedule({
+
       event,
       startTime,
       endTime,
@@ -47,17 +56,26 @@ exports.getEventSchedule = async (req, res) => {
  */
 exports.updateScheduleItem = async (req, res) => {
   try {
-    const scheduleItem = await Schedule.findByIdAndUpdate(
-      req.params.id,
-      { $set: req.body },
-      { new: true, runValidators: true }
-    );
+    const scheduleItem = await Schedule.findById(req.params.id);
 
     if (!scheduleItem) {
       return res.status(404).json({ message: 'Schedule item not found' });
     }
 
-    res.json(scheduleItem);
+    // Check ownership
+    const eventObj = await Event.findById(scheduleItem.event);
+    if (!eventObj || eventObj.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update this schedule item' });
+    }
+
+    const updatedItem = await Schedule.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    res.json(updatedItem);
+
   } catch (error) {
     console.error(error.message);
     res.status(500).send('Server Error');
@@ -71,13 +89,21 @@ exports.updateScheduleItem = async (req, res) => {
  */
 exports.deleteScheduleItem = async (req, res) => {
   try {
-    const scheduleItem = await Schedule.findByIdAndDelete(req.params.id);
+    const scheduleItem = await Schedule.findById(req.params.id);
 
     if (!scheduleItem) {
       return res.status(404).json({ message: 'Schedule item not found' });
     }
 
+    // Check ownership
+    const eventObj = await Event.findById(scheduleItem.event);
+    if (!eventObj || eventObj.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to delete this schedule item' });
+    }
+
+    await Schedule.findByIdAndDelete(req.params.id);
     res.json({ message: 'Schedule item removed' });
+
   } catch (error) {
     console.error(error.message);
     res.status(500).send('Server Error');

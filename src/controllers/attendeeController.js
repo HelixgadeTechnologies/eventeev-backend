@@ -134,7 +134,14 @@ exports.getAttendeesByEvent = async (req, res) => {
       ];
     }
 
+    // Check if user owns the event
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this event\'s attendees' });
+    }
+
     const attendees = await Attendee.find(query).sort({ registrationDate: -1 });
+
     res.json(attendees);
   } catch (error) {
     res.status(500).send('Server Error');
@@ -148,7 +155,14 @@ exports.getAttendeesByEvent = async (req, res) => {
  */
 exports.getAttendeeStats = async (req, res) => {
   try {
+    // Check if user owns the event
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this event\'s statistics' });
+    }
+
     const totalAttendees = await Attendee.countDocuments({ eventId: req.params.eventId });
+
     const verifiedAccess = await Attendee.countDocuments({ eventId: req.params.eventId, isCheckedIn: true });
     
     // Recent activity (e.g., check-ins in the last 30 minutes)
@@ -179,6 +193,13 @@ exports.checkInAttendee = async (req, res) => {
     const attendee = await Attendee.findById(req.params.id);
     if (!attendee) return res.status(404).json({ message: 'Attendee not found' });
 
+    // Check if user owns the event
+    const event = await Event.findById(attendee.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to check-in this attendee' });
+    }
+
+
     attendee.isCheckedIn = !attendee.isCheckedIn;
     attendee.status = attendee.isCheckedIn ? 'verified' : 'pending';
     attendee.checkInTime = attendee.isCheckedIn ? new Date() : null;
@@ -198,6 +219,13 @@ exports.checkInAttendee = async (req, res) => {
 exports.createAttendee = async (req, res) => {
   try {
     const { eventId, name, email, ticketId } = req.body;
+
+    // Check if user owns the event
+    const event = await Event.findById(eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to create attendees for this event' });
+    }
+
 
     const attendeeId = new mongoose.Types.ObjectId();
     const orderId = `CK-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
@@ -255,8 +283,17 @@ exports.createAttendee = async (req, res) => {
  */
 exports.deleteAttendee = async (req, res) => {
   try {
-    const attendee = await Attendee.findByIdAndDelete(req.params.id);
+    const attendee = await Attendee.findById(req.params.id);
     if (!attendee) return res.status(404).json({ message: 'Attendee not found' });
+
+    // Check if user owns the event
+    const event = await Event.findById(attendee.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to delete this attendee' });
+    }
+
+    await Attendee.findByIdAndDelete(req.params.id);
+
     res.json({ message: 'Attendee removed' });
   } catch (error) {
     res.status(500).send('Server Error');

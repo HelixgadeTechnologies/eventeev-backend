@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const gameController = require('../controllers/gameController');
+const auth = require('../middleware/auth');
+
 
 /**
  * @openapi
@@ -22,7 +24,7 @@ const gameController = require('../controllers/gameController');
  *             schema:
  *               $ref: '#/components/schemas/GameSetting'
  */
-router.get('/:eventId/rolling/settings', gameController.getRollingSettings);
+router.get('/:eventId/rolling/settings', auth, gameController.getRollingSettings);
 
 /**
  * @openapi
@@ -46,7 +48,7 @@ router.get('/:eventId/rolling/settings', gameController.getRollingSettings);
  *       200:
  *         description: Settings updated
  */
-router.patch('/:eventId/rolling/settings', gameController.updateRollingSettings);
+router.patch('/:eventId/rolling/settings', auth, gameController.updateRollingSettings);
 
 /**
  * @openapi
@@ -64,7 +66,7 @@ router.patch('/:eventId/rolling/settings', gameController.updateRollingSettings)
  *       200:
  *         description: Success
  */
-router.get('/:eventId/rolling/participants', gameController.getRollingParticipants);
+router.get('/:eventId/rolling/participants', auth, gameController.getRollingParticipants);
 
 /**
  * @openapi
@@ -92,7 +94,7 @@ router.get('/:eventId/rolling/participants', gameController.getRollingParticipan
  *       201:
  *         description: Winner recorded
  */
-router.post('/:eventId/rolling/winner', gameController.recordWinner);
+router.post('/:eventId/rolling/winner', auth, gameController.recordWinner);
 
 /**
  * @openapi
@@ -116,7 +118,7 @@ router.post('/:eventId/rolling/winner', gameController.recordWinner);
  *               items:
  *                 $ref: '#/components/schemas/GameWinner'
  */
-router.get('/:eventId/rolling/winners', gameController.getWinners);
+router.get('/:eventId/rolling/winners', auth, gameController.getWinners);
 
 /**
  * @openapi
@@ -134,7 +136,7 @@ router.get('/:eventId/rolling/winners', gameController.getWinners);
  *       200:
  *         description: Game reset successful
  */
-router.post('/:eventId/rolling/reset', gameController.resetGame);
+router.post('/:eventId/rolling/reset', auth, gameController.resetGame);
 
 /**
  * @openapi
@@ -152,7 +154,7 @@ router.post('/:eventId/rolling/reset', gameController.resetGame);
  *       201:
  *         description: Quiz created
  */
-router.post('/quiz/create', gameController.createQuiz);
+router.post('/quiz/create', auth, gameController.createQuiz);
 
 /**
  * @openapi
@@ -174,7 +176,7 @@ router.post('/quiz/create', gameController.createQuiz);
  *             schema:
  *               $ref: '#/components/schemas/Quiz'
  */
-router.get('/quiz/:id', gameController.getQuiz);
+router.get('/quiz/:id', auth, gameController.getQuiz);
 
 /**
  * @openapi
@@ -196,7 +198,7 @@ router.get('/quiz/:id', gameController.getQuiz);
  *             schema:
  *               $ref: '#/components/schemas/QuizSession'
  */
-router.post('/quiz/:id/session', gameController.hostQuiz);
+router.post('/quiz/:id/session', auth, gameController.hostQuiz);
 
 /**
  * @openapi

@@ -22,8 +22,15 @@ exports.getMe = async (req, res) => {
 exports.updateUser = async (req, res) => {
   const { firstName, lastName, gender, tZone, country, avatar } = req.body;
   try {
+    // Check ownership: Users can only update their own profile
+    if (req.user.id !== req.params.id) {
+      return res.status(403).json({ message: 'User not authorized to update this profile' });
+    }
+
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+
 
     // Update fields if they exist in request body
     user.firstName = firstName || user.firstName;

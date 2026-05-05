@@ -1,5 +1,7 @@
 const Ticket = require('../models/Ticket');
 const Attendee = require('../models/Attendee');
+const Event = require('../models/Event');
+
 
 /**
  * @desc    Create ticket
@@ -9,7 +11,14 @@ const Attendee = require('../models/Attendee');
 exports.createTicket = async (req, res) => {
   const { eventId, name, type, price, suggestedAmount, quantity, startDate, startTime, endDate, endTime, description, status } = req.body;
   try {
+    // Check ownership
+    const event = await Event.findById(eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to create tickets for this event' });
+    }
+
     const ticket = new Ticket({ eventId, name, type, price, suggestedAmount, quantity, startDate, startTime, endDate, endTime, description, status });
+
     await ticket.save();
     res.status(201).json(ticket);
   } catch (error) {
@@ -24,9 +33,19 @@ exports.createTicket = async (req, res) => {
  */
 exports.editTicket = async (req, res) => {
   try {
-    const ticket = await Ticket.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const ticket = await Ticket.findById(req.params.id);
+
     if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-    res.json(ticket);
+
+    // Check ownership
+    const event = await Event.findById(ticket.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update this ticket' });
+    }
+
+    const updatedTicket = await Ticket.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updatedTicket);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -39,9 +58,19 @@ exports.editTicket = async (req, res) => {
  */
 exports.deleteTicket = async (req, res) => {
   try {
-    const ticket = await Ticket.findByIdAndDelete(req.params.id);
+    const ticket = await Ticket.findById(req.params.id);
+
     if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+    // Check ownership
+    const event = await Event.findById(ticket.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to delete this ticket' });
+    }
+
+    await Ticket.findByIdAndDelete(req.params.id);
     res.json({ message: 'Ticket tier removed' });
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -54,10 +83,20 @@ exports.deleteTicket = async (req, res) => {
  */
 exports.updateTicketStatus = async (req, res) => {
   try {
-    const { status } = req.body;
-    const ticket = await Ticket.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    const ticket = await Ticket.findById(req.params.id);
+
     if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-    res.json(ticket);
+
+    // Check ownership
+    const event = await Event.findById(ticket.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update this ticket status' });
+    }
+
+    const { status } = req.body;
+    const updatedTicket = await Ticket.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    res.json(updatedTicket);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -84,8 +123,19 @@ exports.getTicketsByEvent = async (req, res) => {
  */
 exports.getAttendeesByTicket = async (req, res) => {
   try {
+    const ticket = await Ticket.findById(req.params.ticketId);
+
+    if (!ticket) return res.status(404).json({ message: 'Ticket tier not found' });
+
+    // Check ownership
+    const event = await Event.findById(ticket.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this tier\'s attendees' });
+    }
+
     const attendees = await Attendee.find({ ticketId: req.params.ticketId });
     res.json(attendees);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }

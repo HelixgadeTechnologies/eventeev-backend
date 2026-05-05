@@ -1,5 +1,7 @@
 const Poll = require('../models/Poll');
 const Vote = require('../models/Vote');
+const Event = require('../models/Event');
+
 
 /**
  * @desc    Get all polls for an event
@@ -22,7 +24,15 @@ exports.getPollsByEvent = async (req, res) => {
  */
 exports.createPoll = async (req, res) => {
   try {
+    const { eventId } = req.body;
+    // Check ownership
+    const event = await Event.findById(eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to create polls for this event' });
+    }
+
     const poll = new Poll(req.body);
+
     await poll.save();
     res.status(201).json(poll);
   } catch (error) {
@@ -53,13 +63,19 @@ exports.getPollResults = async (req, res) => {
 exports.updatePollStatus = async (req, res) => {
   const { status } = req.body;
   try {
-    const poll = await Poll.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
+    const poll = await Poll.findById(req.params.id);
     if (!poll) return res.status(404).json({ message: 'Poll not found' });
+
+    // Check ownership
+    const event = await Event.findById(poll.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update this poll status' });
+    }
+
+    poll.status = status;
+    await poll.save();
     res.json(poll);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -114,8 +130,17 @@ exports.submitVote = async (req, res) => {
  */
 exports.deletePoll = async (req, res) => {
   try {
-    const poll = await Poll.findByIdAndDelete(req.params.id);
+    const poll = await Poll.findById(req.params.id);
     if (!poll) return res.status(404).json({ message: 'Poll not found' });
+
+    // Check ownership
+    const event = await Event.findById(poll.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to delete this poll' });
+    }
+
+    await Poll.findByIdAndDelete(req.params.id);
+
     
     // Also delete associated votes
     await Vote.deleteMany({ pollId: req.params.id });

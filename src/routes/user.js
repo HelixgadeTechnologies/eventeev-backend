@@ -37,7 +37,7 @@ router.get('/me', auth, userController.getMe);
  *               items:
  *                 $ref: '#/components/schemas/User'
  */
-router.get('/all', userController.getAllUsers);
+router.get('/all', auth, userController.getAllUsers);
 
 /**
  * @openapi
@@ -61,7 +61,7 @@ router.get('/all', userController.getAllUsers);
  *       404:
  *         description: User not found
  */
-router.get('/:id', userController.getUser);
+router.get('/:id', auth, userController.getUser);
 
 /**
  * @openapi
@@ -87,6 +87,6 @@ router.get('/:id', userController.getUser);
  *       404:
  *         description: User not found
  */
-router.put('/updateuser/:id', userController.updateUser);
+router.put('/updateuser/:id', auth, userController.updateUser);
 
 module.exports = router;

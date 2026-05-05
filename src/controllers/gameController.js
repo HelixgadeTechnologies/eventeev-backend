@@ -1,5 +1,7 @@
 const { GameSetting, GameWinner, Quiz, QuizSession } = require('../models/Game');
 const User = require('../models/User');
+const Event = require('../models/Event');
+
 
 // ... (Previous Rolling Game logic) ...
 
@@ -10,7 +12,15 @@ const User = require('../models/User');
  */
 exports.createQuiz = async (req, res) => {
   try {
+    const { eventId } = req.body;
+    // Check ownership
+    const event = await Event.findById(eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to create quizzes for this event' });
+    }
+
     const quiz = new Quiz(req.body);
+
     await quiz.save();
     res.status(201).json(quiz);
   } catch (error) {
@@ -27,7 +37,15 @@ exports.getQuiz = async (req, res) => {
   try {
     const quiz = await Quiz.findById(req.params.id);
     if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+
+    // Check ownership
+    const event = await Event.findById(quiz.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this quiz' });
+    }
+
     res.json(quiz);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -40,7 +58,17 @@ exports.getQuiz = async (req, res) => {
  */
 exports.hostQuiz = async (req, res) => {
   try {
+    const quiz = await Quiz.findById(req.params.id);
+    if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+
+    // Check ownership
+    const event = await Event.findById(quiz.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to host this quiz' });
+    }
+
     const pin = Math.floor(100000 + Math.random() * 900000).toString();
+
     const session = new QuizSession({
       quizId: req.params.id,
       hostId: req.user.id, // Assuming auth middleware provides req.user
@@ -129,7 +157,14 @@ exports.getLeaderboard = async (req, res) => {
  */
 exports.getRollingSettings = async (req, res) => {
   try {
+    // Check ownership
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access these settings' });
+    }
+
     let settings = await GameSetting.findOne({ eventId: req.params.eventId, gameType: 'rolling' });
+
     if (!settings) {
       // Create default settings if none exist
       settings = new GameSetting({ eventId: req.params.eventId });
@@ -148,7 +183,14 @@ exports.getRollingSettings = async (req, res) => {
  */
 exports.updateRollingSettings = async (req, res) => {
   try {
+    // Check ownership
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update these settings' });
+    }
+
     const settings = await GameSetting.findOneAndUpdate(
+
       { eventId: req.params.eventId, gameType: 'rolling' },
       req.body,
       { new: true, upsert: true }
@@ -166,7 +208,14 @@ exports.updateRollingSettings = async (req, res) => {
  */
 exports.getRollingParticipants = async (req, res) => {
   try {
+    // Check ownership
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access participants' });
+    }
+
     const settings = await GameSetting.findOne({ eventId: req.params.eventId, gameType: 'rolling' });
+
     const filter = settings?.participantFilter || 'checked-in';
 
     // Mocking logic for attendee filtering
@@ -188,7 +237,14 @@ exports.getRollingParticipants = async (req, res) => {
 exports.recordWinner = async (req, res) => {
   const { userId, prizeWon } = req.body;
   try {
+    // Check ownership
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to record winners' });
+    }
+
     const winner = new GameWinner({
+
       eventId: req.params.eventId,
       userId,
       prizeWon
@@ -207,7 +263,14 @@ exports.recordWinner = async (req, res) => {
  */
 exports.getWinners = async (req, res) => {
   try {
+    // Check ownership
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to view winners' });
+    }
+
     const winners = await GameWinner.find({ eventId: req.params.eventId, gameType: 'rolling' })
+
       .populate('userId', 'firstName lastName email avatar')
       .sort({ rolledAt: -1 });
     res.json(winners);
@@ -223,7 +286,14 @@ exports.getWinners = async (req, res) => {
  */
 exports.resetGame = async (req, res) => {
   try {
+    // Check ownership
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to reset game history' });
+    }
+
     await GameWinner.deleteMany({ eventId: req.params.eventId, gameType: 'rolling' });
+
     res.json({ message: 'Game history reset' });
   } catch (error) {
     res.status(500).send('Server Error');

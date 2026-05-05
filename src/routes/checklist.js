@@ -24,7 +24,7 @@ const auth = require('../middleware/auth');
  *               items:
  *                 $ref: '#/components/schemas/Checklist'
  */
-router.get('/event/:eventId', checklistController.getEventChecklist);
+router.get('/event/:eventId', auth, checklistController.getEventChecklist);
 
 /**
  * @openapi

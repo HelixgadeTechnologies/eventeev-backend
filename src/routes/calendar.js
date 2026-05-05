@@ -23,6 +23,7 @@ router.get('/', calendarController.getCalendarEvents);
  */
 router.post(
   '/',
+  auth,
   [
     check('title', 'Title is required').not().isEmpty(),
     check('startDate', 'Start date is required').isISO8601(),

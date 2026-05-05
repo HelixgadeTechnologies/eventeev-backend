@@ -1,4 +1,6 @@
 const Speaker = require('../models/Speaker');
+const Event = require('../models/Event');
+
 
 /**
  * @desc    Get all speakers for an event
@@ -7,8 +9,16 @@ const Speaker = require('../models/Speaker');
  */
 exports.getSpeakersByEvent = async (req, res) => {
   try {
+    // Check if user owns the event
+
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this event\'s speakers' });
+    }
+
     const speakers = await Speaker.find({ eventId: req.params.eventId });
     res.json(speakers);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -35,6 +45,12 @@ exports.createSpeaker = async (req, res) => {
   } = req.body;
 
   try {
+    // Check if user owns the event
+    const event = await Event.findById(eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to create speakers for this event' });
+    }
+
     // Structure social links if they were passed flatly
     const finalSocialLinks = socialLinks || {
       twitter: twitter || '',
@@ -95,9 +111,19 @@ exports.getSpeaker = async (req, res) => {
  */
 exports.updateSpeaker = async (req, res) => {
   try {
-    const speaker = await Speaker.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const speaker = await Speaker.findById(req.params.id);
+
     if (!speaker) return res.status(404).json({ message: 'Speaker not found' });
-    res.json(speaker);
+
+    // Check ownership
+    const event = await Event.findById(speaker.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update this speaker' });
+    }
+
+    const updatedSpeaker = await Speaker.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updatedSpeaker);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -110,9 +136,19 @@ exports.updateSpeaker = async (req, res) => {
  */
 exports.deleteSpeaker = async (req, res) => {
   try {
-    const speaker = await Speaker.findByIdAndDelete(req.params.id);
+    const speaker = await Speaker.findById(req.params.id);
+
     if (!speaker) return res.status(404).json({ message: 'Speaker not found' });
+
+    // Check ownership
+    const event = await Event.findById(speaker.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to delete this speaker' });
+    }
+
+    await Speaker.findByIdAndDelete(req.params.id);
     res.json({ message: 'Speaker removed' });
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -125,14 +161,20 @@ exports.deleteSpeaker = async (req, res) => {
  */
 exports.manageSessions = async (req, res) => {
   try {
-    const { sessions } = req.body;
-    const speaker = await Speaker.findByIdAndUpdate(
-      req.params.id,
-      { sessions },
-      { new: true }
-    );
+    const speaker = await Speaker.findById(req.params.id);
+
     if (!speaker) return res.status(404).json({ message: 'Speaker not found' });
+
+    // Check ownership
+    const event = await Event.findById(speaker.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to manage sessions for this speaker' });
+    }
+
+    speaker.sessions = sessions;
+    await speaker.save();
     res.json(speaker);
+
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -146,6 +188,14 @@ exports.manageSessions = async (req, res) => {
 exports.getSpeakerStats = async (req, res) => {
   try {
     const eventId = req.params.eventId;
+
+
+    // Check if user owns the event
+    const event = await Event.findById(eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this event\'s speaker statistics' });
+    }
+
     
     // Count total speakers
     const totalSpeakers = await Speaker.countDocuments({ eventId });

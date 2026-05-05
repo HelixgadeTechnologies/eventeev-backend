@@ -1,5 +1,7 @@
 const Room = require('../models/Room');
 const Message = require('../models/Message');
+const Event = require('../models/Event');
+
 
 /**
  * @desc    Create a new chat room
@@ -9,7 +11,14 @@ const Message = require('../models/Message');
 exports.createRoom = async (req, res) => {
   const { event, name, type, leadParticipant } = req.body;
   try {
+    // Check ownership
+    const eventObj = await Event.findById(event);
+    if (!eventObj || eventObj.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to create rooms for this event' });
+    }
+
     const room = new Room({
+
       event,
       name,
       type,

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const speakerController = require('../controllers/speakerController');
+const auth = require('../middleware/auth');
+
 
 /**
  * @openapi
@@ -24,8 +26,9 @@ const speakerController = require('../controllers/speakerController');
  *               items:
  *                 $ref: '#/components/schemas/Speaker'
  */
-router.get('/event/:eventId', speakerController.getSpeakersByEvent);
-router.get('/event/:eventId/stats', speakerController.getSpeakerStats);
+router.get('/event/:eventId', auth, speakerController.getSpeakersByEvent);
+router.get('/event/:eventId/stats', auth, speakerController.getSpeakerStats);
+
 
 /**
  * @openapi
@@ -43,7 +46,7 @@ router.get('/event/:eventId/stats', speakerController.getSpeakerStats);
  *       201:
  *         description: Speaker created
  */
-router.post('/create', speakerController.createSpeaker);
+router.post('/create', auth, speakerController.createSpeaker);
 
 /**
  * @openapi
@@ -65,7 +68,7 @@ router.post('/create', speakerController.createSpeaker);
  *             schema:
  *               $ref: '#/components/schemas/Speaker'
  */
-router.get('/:id', speakerController.getSpeaker);
+router.get('/:id', auth, speakerController.getSpeaker);
 
 /**
  * @openapi
@@ -89,7 +92,7 @@ router.get('/:id', speakerController.getSpeaker);
  *       200:
  *         description: Speaker updated
  */
-router.put('/edit/:id', speakerController.updateSpeaker);
+router.put('/edit/:id', auth, speakerController.updateSpeaker);
 
 /**
  * @openapi
@@ -107,7 +110,7 @@ router.put('/edit/:id', speakerController.updateSpeaker);
  *       200:
  *         description: Speaker deleted
  */
-router.delete('/:id', speakerController.deleteSpeaker);
+router.delete('/:id', auth, speakerController.deleteSpeaker);
 
 /**
  * @openapi
@@ -136,6 +139,6 @@ router.delete('/:id', speakerController.deleteSpeaker);
  *       200:
  *         description: Sessions updated
  */
-router.post('/:id/sessions', speakerController.manageSessions);
+router.post('/:id/sessions', auth, speakerController.manageSessions);
 
 module.exports = router;
