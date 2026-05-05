@@ -1,5 +1,8 @@
 const Attendee = require('../models/Attendee');
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const Event = require('../models/Event');
+
 const Ticket = require('../models/Ticket');
 const { createNotification } = require('./notificationController');
 const sendEmail = require('../utils/sendEmail');
@@ -112,6 +115,117 @@ exports.registerAttendee = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Google registration for an event
+ * @route   POST /api/attendee/google-register
+ * @access  Public
+ */
+exports.googleRegisterAttendee = async (req, res) => {
+  const { eventId, idToken, ticketId } = req.body;
+
+  try {
+    // 1. Verify Google ID Token
+    const ticketObj = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticketObj.getPayload();
+    const { sub: googleId, email, name } = payload;
+
+    // 2. Validate Event existence and status
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (event.status !== 'Published') {
+      return res.status(400).json({ message: 'Registration is not open for this event' });
+    }
+
+    // 3. Prevent duplicate registrations for same email + event
+    const existingRegistration = await Attendee.findOne({ eventId, email });
+    if (existingRegistration) {
+      return res.status(400).json({ message: 'You have already registered for this event' });
+    }
+
+    // 4. Validate Ticket and Quantity
+    let ticket = null;
+    if (ticketId) {
+      ticket = await Ticket.findOneAndUpdate(
+        { _id: ticketId, eventId, quantity: { $gt: 0 } },
+        { $inc: { quantity: -1 } },
+        { new: true }
+      );
+
+      if (!ticket) {
+        return res.status(400).json({ message: 'Ticket is sold out or invalid' });
+      }
+
+      if (ticket.quantity === 0) {
+        ticket.status = 'Sold Out';
+        await ticket.save();
+      }
+    }
+
+    // 5. Create Attendee
+    const attendeeId = new mongoose.Types.ObjectId();
+    const orderId = `REG-G-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
+    
+    const attendee = new Attendee({
+      _id: attendeeId,
+      eventId,
+      ticketId,
+      name,
+      email,
+      googleId,
+      orderId,
+      qrCode: qrCodeUrl,
+      status: 'pending'
+    });
+
+    await attendee.save();
+
+    // 6. Notify Organiser
+    await createNotification({
+      recipient: event.owner,
+      type: 'ticket',
+      title: 'New Google Registration!',
+      message: `${name} has just registered via Google for your event: ${event.title}`,
+      link: `/events/${event._id}/attendees`
+    });
+
+    // 7. Send Registration Email
+    try {
+      const ticketType = ticket ? ticket.name : 'General Admission';
+      const amountPaid = ticket && ticket.price ? `$${ticket.price}` : 'Free';
+
+      const htmlTemplate = generateRegistrationEmail({
+        name,
+        event,
+        ticketType,
+        orderId,
+        qrCodeUrl,
+        amountPaid,
+        attendeeId: attendee._id
+      });
+
+      await sendEmail({
+        email: email,
+        subject: `You’re In! Confirmation for ${event.title}`,
+        html: htmlTemplate
+      });
+
+    } catch (emailErr) {
+      console.error('[Google Register Attendee] Registration email sending error:', emailErr);
+    }
+
+    res.status(201).json(attendee);
+  } catch (error) {
+    console.error('[Google Register Attendee] Error:', error);
+    res.status(401).json({ message: 'Invalid Google token' });
+  }
+};
+
 
 /**
  * @desc    Get all attendees for an event

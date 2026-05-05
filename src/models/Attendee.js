@@ -77,10 +77,14 @@ const AttendeeSchema = new mongoose.Schema({
     enum: ['pending', 'verified', 'cancelled'],
     default: 'pending',
   },
+  googleId: {
+    type: String,
+  },
   registrationDate: {
     type: Date,
     default: Date.now,
   },
 });
+
 
 module.exports = mongoose.model('Attendee', AttendeeSchema);

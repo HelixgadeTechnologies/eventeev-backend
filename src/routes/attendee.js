@@ -128,6 +128,34 @@ router.post('/register', attendeeController.registerAttendee);
 
 /**
  * @openapi
+ * /api/attendee/google-register:
+ *   post:
+ *     tags: [Attendees]
+ *     summary: Public registration for an event via Google (unauthenticated)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [eventId, idToken]
+ *             properties:
+ *               eventId: { type: string }
+ *               idToken: { type: string }
+ *               ticketId: { type: string }
+ *     responses:
+ *       201:
+ *         description: Successfully registered
+ *       400:
+ *         description: Already registered or Sold out
+ *       401:
+ *         description: Invalid Google token
+ */
+router.post('/google-register', attendeeController.googleRegisterAttendee);
+
+
+/**
+ * @openapi
  * /api/attendee/ticket/{id}/download:
  *   get:
  *     tags: [Attendees]
