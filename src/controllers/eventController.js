@@ -4,6 +4,8 @@ const Ticket = require('../models/Ticket');
 const Speaker = require('../models/Speaker');
 const Schedule = require('../models/Schedule');
 const Room = require('../models/Room');
+const User = require('../models/User');
+const { addEventToGoogleCalendar } = require('../utils/googleCalendar');
 const { isEventExpired } = require('../utils/eventStatus');
 
 /**
@@ -241,6 +243,17 @@ exports.publishEvent = async (req, res) => {
     // Create General Lobby room for the event
     await ensureGeneralLobby(event._id);
     
+    // Sync to Organizer's Google Calendar
+    try {
+      const user = await User.findById(req.user.id).select('+googleRefreshToken');
+      if (user && user.googleRefreshToken && event.status === 'Published') {
+        console.log(`[Google Calendar Sync] Syncing created event "${event.title}" for organizer ${user.email}`);
+        await addEventToGoogleCalendar(user, event);
+      }
+    } catch (syncErr) {
+      console.error('[Google Calendar Sync] Error syncing created event for organizer:', syncErr);
+    }
+    
     res.status(201).json(event);
   } catch (error) {
     console.error('[Publish Event] Error:', error);
@@ -273,9 +286,19 @@ exports.draftToLive = async (req, res) => {
     event.status = 'Published';
     await event.save();
 
-    
     // Create General Lobby room for the event
     await ensureGeneralLobby(event._id);
+
+    // Sync to Organizer's Google Calendar
+    try {
+      const user = await User.findById(req.user.id).select('+googleRefreshToken');
+      if (user && user.googleRefreshToken) {
+        console.log(`[Google Calendar Sync] Syncing draft-to-live event "${event.title}" for organizer ${user.email}`);
+        await addEventToGoogleCalendar(user, event);
+      }
+    } catch (syncErr) {
+      console.error('[Google Calendar Sync] Error syncing draft-to-live event for organizer:', syncErr);
+    }
     
     res.json(event);
   } catch (error) {

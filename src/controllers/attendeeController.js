@@ -11,6 +11,7 @@ const { generateTicketPDF } = require('../utils/pdfGenerator');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const CalendarEvent = require('../models/CalendarEvent');
+const { addEventToGoogleCalendar } = require('../utils/googleCalendar');
 
 
 /**
@@ -18,41 +19,42 @@ const CalendarEvent = require('../models/CalendarEvent');
  */
 const syncToCalendar = async (email, event) => {
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('+googleRefreshToken');
     if (!user) {
       console.log(`[Calendar Sync] No user account found for email: ${email}. Skipping calendar entry.`);
       return;
     }
 
-    // Check if already in calendar
+    // 1. Local Database Sync (Internal Calendar Feature)
     const existingEntry = await CalendarEvent.findOne({ 
       owner: user._id, 
       originalEventId: event._id 
     });
 
-    if (existingEntry) {
-      console.log(`[Calendar Sync] Event "${event.title}" already exists in calendar for user: ${email}`);
-      return;
+    if (!existingEntry) {
+      const calendarEvent = new CalendarEvent({
+        title: event.title,
+        description: event.description,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        location: event.location,
+        category: event.category,
+        type: event.type,
+        owner: user._id,
+        originalEventId: event._id,
+        isRegistrationEntry: true
+      });
+      await calendarEvent.save();
+      console.log(`[Calendar Sync] Event "${event.title}" synced to internal calendar for user: ${email}`);
     }
 
-    // Create new calendar entry
-    const calendarEvent = new CalendarEvent({
-      title: event.title,
-      description: event.description,
-      startDate: event.startDate,
-      endDate: event.endDate,
-      startTime: event.startTime,
-      endTime: event.endTime,
-      location: event.location,
-      category: event.category,
-      type: event.type,
-      owner: user._id,
-      originalEventId: event._id,
-      isRegistrationEntry: true
-    });
-
-    await calendarEvent.save();
-    console.log(`[Calendar Sync] Event "${event.title}" synced to calendar for user: ${email}`);
+    // 2. Google Calendar Sync
+    if (user.googleRefreshToken) {
+      console.log(`[Google Calendar Sync] Attempting to sync event "${event.title}" for ${email}`);
+      await addEventToGoogleCalendar(user, event);
+    }
   } catch (err) {
     console.error(`[Calendar Sync] Error syncing event to calendar for ${email}:`, err.message);
   }
