@@ -5,12 +5,14 @@ const connectDB = require('./config/db');
 const app = require('./app');
 const Message = require('./models/Message');
 const startEventStatusTask = require('./tasks/statusTask');
+const startReminderTask = require('./tasks/reminderTask');
 
 // Connect Database
 connectDB();
 
 // Start Background Tasks
 startEventStatusTask();
+startReminderTask();
 
 // Validate critical environment variables
 const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'JWT_EXPIRES_IN', 'EMAIL_USER', 'EMAIL_APP_PASS'];

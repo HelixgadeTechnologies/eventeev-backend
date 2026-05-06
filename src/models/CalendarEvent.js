@@ -40,6 +40,10 @@ const mongoose = require('mongoose');
  *           enum: [virtual, hybrid, in person]
  *         owner:
  *           type: string
+ *         originalEventId:
+ *           type: string
+ *         isRegistrationEntry:
+ *           type: boolean
  */
 const CalendarEventSchema = new mongoose.Schema({
   title: {
@@ -84,6 +88,15 @@ const CalendarEventSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: false,
+  },
+  originalEventId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    required: false,
+  },
+  isRegistrationEntry: {
+    type: Boolean,
+    default: false,
   },
   createdAt: {
     type: Date,

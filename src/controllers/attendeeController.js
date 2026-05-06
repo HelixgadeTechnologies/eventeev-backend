@@ -9,6 +9,54 @@ const sendEmail = require('../utils/sendEmail');
 const { generateRegistrationEmail } = require('../utils/registrationTemplate');
 const { generateTicketPDF } = require('../utils/pdfGenerator');
 const mongoose = require('mongoose');
+const User = require('../models/User');
+const CalendarEvent = require('../models/CalendarEvent');
+
+
+/**
+ * Helper to sync event to attendee's calendar if they have an account
+ */
+const syncToCalendar = async (email, event) => {
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log(`[Calendar Sync] No user account found for email: ${email}. Skipping calendar entry.`);
+      return;
+    }
+
+    // Check if already in calendar
+    const existingEntry = await CalendarEvent.findOne({ 
+      owner: user._id, 
+      originalEventId: event._id 
+    });
+
+    if (existingEntry) {
+      console.log(`[Calendar Sync] Event "${event.title}" already exists in calendar for user: ${email}`);
+      return;
+    }
+
+    // Create new calendar entry
+    const calendarEvent = new CalendarEvent({
+      title: event.title,
+      description: event.description,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      location: event.location,
+      category: event.category,
+      type: event.type,
+      owner: user._id,
+      originalEventId: event._id,
+      isRegistrationEntry: true
+    });
+
+    await calendarEvent.save();
+    console.log(`[Calendar Sync] Event "${event.title}" synced to calendar for user: ${email}`);
+  } catch (err) {
+    console.error(`[Calendar Sync] Error syncing event to calendar for ${email}:`, err.message);
+  }
+};
 
 
 
@@ -73,7 +121,10 @@ exports.registerAttendee = async (req, res) => {
 
     await attendee.save();
 
-    // 5. Notify Organiser
+    // 5. Sync to Calendar (If user exists)
+    await syncToCalendar(email, event);
+
+    // 6. Notify Organiser
     await createNotification({
       recipient: event.owner,
       type: 'ticket',
@@ -185,7 +236,10 @@ exports.googleRegisterAttendee = async (req, res) => {
 
     await attendee.save();
 
-    // 6. Notify Organiser
+    // 6. Sync to Calendar (If user exists)
+    await syncToCalendar(email, event);
+
+    // 7. Notify Organiser
     await createNotification({
       recipient: event.owner,
       type: 'ticket',
@@ -348,9 +402,11 @@ exports.createAttendee = async (req, res) => {
     const attendee = new Attendee({ ...req.body, _id: attendeeId, orderId, qrCode: qrCodeUrl });
     await attendee.save();
 
+    // Sync to Calendar (If user exists)
+    await syncToCalendar(email, event);
+
     // Send order confirmation email
     try {
-      const event = await Event.findById(eventId);
       let ticket = null;
       if (ticketId) {
         ticket = await Ticket.findById(ticketId);

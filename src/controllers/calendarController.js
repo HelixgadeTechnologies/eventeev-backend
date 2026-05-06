@@ -49,13 +49,28 @@ exports.createCalendarEvent = async (req, res) => {
 };
 
 /**
+ * @desc    Get current user's calendar events
+ * @route   GET /api/calendar/me
+ * @access  Private
+ */
+exports.getMyCalendarEvents = async (req, res) => {
+  try {
+    const events = await CalendarEvent.find({ owner: req.user.id }).sort({ startDate: 1 });
+    res.json(events);
+  } catch (error) {
+    console.error('[Get My Calendar Events] Error:', error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
  * @desc    Get all calendar events (Public)
  * @route   GET /api/calendar
  * @access  Public
  */
 exports.getCalendarEvents = async (req, res) => {
   try {
-    const events = await CalendarEvent.find().sort({ startDate: 1 });
+    const events = await CalendarEvent.find({ owner: { $exists: false } }).sort({ startDate: 1 });
     res.json(events);
   } catch (error) {
     console.error('[Get Calendar Events] Error:', error.message);

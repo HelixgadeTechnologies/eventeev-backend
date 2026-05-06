@@ -16,6 +16,17 @@ router.get('/', calendarController.getCalendarEvents);
 
 /**
  * @openapi
+ * /api/calendar/me:
+ *   get:
+ *     tags: [Calendar]
+ *     summary: Get current user's calendar events
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/me', auth, calendarController.getMyCalendarEvents);
+
+/**
+ * @openapi
  * /api/calendar:
  *   post:
  *     tags: [Calendar]
