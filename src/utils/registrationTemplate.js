@@ -87,7 +87,8 @@ const generateRegistrationEmail = ({ name, event, ticketType, orderId, qrCodeUrl
       </div>
       
       <p style="text-align: center; margin-top: 20px;">
-        <a href="${backendUrl}/api/attendee/ticket/${attendeeId}/download" style="background-color: ${primaryColor}; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(255,107,0,0.2);">Download Ticket as PDF</a>
+        <a href="${backendUrl}/api/attendee/ticket/${attendeeId}/download" style="background-color: ${primaryColor}; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(255,107,0,0.2); margin-right: 10px;">Download Ticket as PDF</a>
+        <a href="${backendUrl}/api/event/${event._id}/ics" style="background-color: #ffffff; color: #101828; padding: 16px 32px; border: 2px solid #EAECF0; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block;">Add to Calendar</a>
       </p>
     </div>
 

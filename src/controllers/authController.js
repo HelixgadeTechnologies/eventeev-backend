@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
-const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const { google } = require('googleapis');
+const client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  'postmessage' // Special value for @react-oauth/google's code flow
+);
 const bcrypt = require('bcryptjs');
 
 const crypto = require('crypto');
@@ -546,28 +550,48 @@ exports.waitlist = async (req, res) => {
  * @access  Public
  */
 exports.googleLogin = async (req, res) => {
-  const { idToken } = req.body;
+  const { idToken, code } = req.body;
 
   try {
-    // 1. Verify Google ID Token
-    const ticket = await client.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    let payload;
+    let refreshToken;
 
-    const payload = ticket.getPayload();
+    if (code) {
+      // 1a. Exchange Authorization Code for Tokens
+      // Note: 'code' flow is required to get a refresh_token
+      const { tokens } = await client.getToken(code);
+      client.setCredentials(tokens);
+      
+      const ticket = await client.verifyIdToken({
+        idToken: tokens.id_token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+      refreshToken = tokens.refresh_token;
+    } else if (idToken) {
+      // 1b. Verify Google ID Token (legacy/standard flow - no refresh token usually)
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } else {
+      return res.status(400).json({ message: 'Missing idToken or code' });
+    }
+
     const { sub: googleId, email, given_name: firstName, family_name: lastName, picture: avatar } = payload;
 
-    // 2. Find user by email (primary key for account linking)
-    let user = await User.findOne({ email });
+    // 2. Find user by email
+    let user = await User.findOne({ email }).select('+googleRefreshToken');
 
     if (user) {
-      // User exists, link Google ID if not already linked
-      if (!user.googleId) {
-        user.googleId = googleId;
-        user.isVerified = true; // Google accounts are verified
-        await user.save();
+      // User exists, update Google info
+      user.googleId = googleId;
+      user.isVerified = true;
+      if (refreshToken) {
+        user.googleRefreshToken = refreshToken;
       }
+      await user.save();
     } else {
       // 3. Signup - New User
       user = new User({
@@ -575,8 +599,9 @@ exports.googleLogin = async (req, res) => {
         lastName,
         email,
         googleId,
+        googleRefreshToken: refreshToken,
         avatar,
-        isVerified: true, // Google accounts are verified
+        isVerified: true,
         role: 'user'
       });
       await user.save();
@@ -614,7 +639,7 @@ exports.googleLogin = async (req, res) => {
 
   } catch (error) {
     console.error('[Google Auth] Verification Error:', error);
-    res.status(401).json({ message: 'Invalid Google token' });
+    res.status(401).json({ message: 'Invalid Google credentials', error: error.message });
   }
 };
 

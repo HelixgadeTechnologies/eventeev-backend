@@ -173,6 +173,7 @@ router.post('/drafttolive/:id', auth, eventController.draftToLive);
  *         description: Event not found
  */
 router.get('/:id', eventController.getEventById);
+router.get('/:id/ics', eventController.generateICS);
 router.put('/:id', auth, eventController.updateEvent);
 
 /**

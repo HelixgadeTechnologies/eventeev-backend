@@ -368,3 +368,48 @@ exports.getEventById = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+/**
+ * @desc    Generate and download ICS file for an event
+ * @route   GET /api/event/:id/ics
+ * @access  Public
+ */
+exports.generateICS = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    // Ensure we have a valid start date
+    const startDate = new Date(event.startDate);
+    const endDate = new Date(event.endDate || event.startDate);
+    
+    // Format dates for ICS: YYYYMMDDTHHMMSSZ
+    const formatDate = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Eventeev//EN',
+      'BEGIN:VEVENT',
+      `UID:${event._id}@eventeev.com`,
+      `DTSTAMP:${formatDate(new Date())}`,
+      `DTSTART:${formatDate(startDate)}`,
+      `DTEND:${formatDate(endDate)}`,
+      `SUMMARY:${event.title}`,
+      `DESCRIPTION:${event.description ? event.description.replace(/\n/g, '\\n') : ''}`,
+      `LOCATION:${event.location || 'Online'}`,
+      `URL:${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`,
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    res.set({
+      'Content-Type': 'text/calendar',
+      'Content-Disposition': `attachment; filename="${event.title.replace(/[^a-z0-9]/gi, '_')}.ics"`
+    });
+
+    res.send(icsContent);
+  } catch (error) {
+    console.error('[Generate ICS] Error:', error);
+    res.status(500).send('Error generating calendar file');
+  }
+};

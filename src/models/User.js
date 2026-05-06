@@ -134,6 +134,10 @@ const UserSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
   },
+  googleRefreshToken: {
+    type: String,
+    select: false, // Don't include in normal queries for security
+  },
   loginAttempts: {
     type: Number,
     required: true,
