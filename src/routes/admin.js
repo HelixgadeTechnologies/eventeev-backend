@@ -78,6 +78,8 @@ router.get('/events', adminController.getEvents);
  *     tags: [Admin]
  *     summary: Delete event
  */
+router.get('/events/:id', adminController.getEventById);
+router.get('/events/:id/attendees', adminController.getEventAttendees);
 router.delete('/events/:id', adminController.deleteEvent);
 
 /**
@@ -115,5 +117,8 @@ router.get('/revenue', adminController.getTotalRevenue);
  *     summary: Get revenue for a specific event
  */
 router.get('/revenue/event/:id', adminController.getEventRevenue);
+router.get('/games/quizzes', adminController.getAllQuizzes);
+router.post('/games/quizzes', adminController.adminCreateQuiz);
+router.delete('/games/quizzes/:id', adminController.deleteQuiz);
 
 module.exports = router;

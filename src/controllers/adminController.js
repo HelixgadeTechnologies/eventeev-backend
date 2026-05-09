@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const Attendee = require('../models/Attendee');
 const Ticket = require('../models/Ticket');
+const { Quiz, GameSetting } = require('../models/Game');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { validationResult } = require('express-validator');
@@ -385,6 +386,88 @@ exports.getEventRevenue = async (req, res) => {
     res.json({ eventId: req.params.id, totalAmount: total, verifiedTickets: count });
   } catch (error) {
     console.error('[Admin Event Revenue] Error:', error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Get specific event by ID
+ * @route   GET /api/admin/events/:id
+ * @access  Private/Admin
+ */
+exports.getEventById = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id).populate('owner', 'firstName lastName email');
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    res.json(event);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Get all attendees for a specific event
+ * @route   GET /api/admin/events/:id/attendees
+ * @access  Private/Admin
+ */
+exports.getEventAttendees = async (req, res) => {
+  try {
+    const attendees = await Attendee.find({ eventId: req.params.id })
+      .sort({ createdAt: -1 });
+    res.json(attendees);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Get all quizzes
+ * @route   GET /api/admin/games/quizzes
+ * @access  Private/Admin
+ */
+exports.getAllQuizzes = async (req, res) => {
+  try {
+    const quizzes = await Quiz.find()
+      .populate('eventId', 'title image_url')
+      .sort({ createdAt: -1 });
+    res.json(quizzes);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Create a quiz (Admin version)
+ * @route   POST /api/admin/games/quizzes
+ * @access  Private/Admin
+ */
+exports.adminCreateQuiz = async (req, res) => {
+  try {
+    const quiz = new Quiz(req.body);
+    await quiz.save();
+    res.status(201).json(quiz);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Delete a quiz
+ * @route   DELETE /api/admin/games/quizzes/:id
+ * @access  Private/Admin
+ */
+exports.deleteQuiz = async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+    if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+    await quiz.deleteOne();
+    res.json({ message: 'Quiz removed' });
+  } catch (error) {
+    console.error(error.message);
     res.status(500).send('Server Error');
   }
 };
