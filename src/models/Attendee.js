@@ -84,6 +84,12 @@ const AttendeeSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  paymentReference: {
+    type: String,
+  },
+  amount: {
+    type: Number,
+  },
 });
 
 

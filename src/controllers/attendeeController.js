@@ -15,6 +15,38 @@ const { addEventToGoogleCalendar } = require('../utils/googleCalendar');
 
 
 /**
+ * Helper to verify Paystack payment
+ */
+const verifyPaystackPayment = async (reference, expectedAmount) => {
+  try {
+    if (!reference) return { success: false, message: 'Payment reference is required' };
+    
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      },
+    });
+
+    const result = await response.json();
+    if (!result.status) return { success: false, message: result.message || 'Payment verification failed' };
+    
+    // Check status and amount (Paystack amount is in kobo/cents)
+    const isPaid = result.data.status === 'success';
+    const amountMatches = expectedAmount ? result.data.amount === Math.round(expectedAmount * 100) : true;
+
+    if (!isPaid) return { success: false, message: 'Transaction was not successful' };
+    if (!amountMatches) return { success: false, message: 'Payment amount mismatch' };
+
+    return { success: true, data: result.data };
+  } catch (err) {
+    console.error('[Paystack Verification] Error:', err.message);
+    return { success: false, message: 'Network error during payment verification' };
+  }
+};
+
+
+/**
  * Helper to sync event to attendee's calendar if they have an account
  */
 const syncToCalendar = async (email, event) => {
@@ -63,109 +95,145 @@ const syncToCalendar = async (email, event) => {
 
 
 /**
+ * Core registration logic (reusable for HTTP and Webhooks)
+ */
+const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, amount, googleId }) => {
+  // 1. Validate Event existence and status
+  const event = await Event.findById(eventId);
+  if (!event) throw new Error('Event not found');
+  if (event.status !== 'Published') {
+    throw new Error('Registration is not open for this event');
+  }
+
+  // 2. Prevent duplicate registrations for same email + event
+  const existingRegistration = await Attendee.findOne({ eventId, email });
+  if (existingRegistration) {
+    return { alreadyRegistered: true, attendee: existingRegistration };
+  }
+
+  // 3. Validate Ticket and Quantity
+  let ticket = null;
+  if (ticketId) {
+    // Use atomic update to decrement quantity only if it is > 0
+    ticket = await Ticket.findOneAndUpdate(
+      { _id: ticketId, eventId, quantity: { $gt: 0 } },
+      { $inc: { quantity: -1 } },
+      { new: true }
+    );
+
+    if (!ticket) {
+      throw new Error('Ticket is sold out or invalid');
+    }
+
+    // Automatically mark as "Sold Out" if count hits 0
+    if (ticket.quantity === 0) {
+      ticket.status = 'Sold Out';
+      await ticket.save();
+    }
+  }
+
+  // 4. Determine expected amount
+  const isDonation = ticket && ticket.type?.toLowerCase() === 'donation';
+  const expectedAmount = isDonation ? amount : (ticket ? ticket.price : 0);
+
+  // 5. Create Attendee
+  const attendeeId = new mongoose.Types.ObjectId();
+  const orderId = googleId 
+    ? `REG-G-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`
+    : `REG-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
+  
+  const attendee = new Attendee({
+    _id: attendeeId,
+    eventId,
+    ticketId,
+    name,
+    email,
+    googleId,
+    orderId,
+    qrCode: qrCodeUrl,
+    paymentReference,
+    amount: expectedAmount,
+    status: 'verified' 
+  });
+
+  await attendee.save();
+
+  // 6. Sync to Calendar (If user exists)
+  await syncToCalendar(email, event);
+
+  // 7. Notify Organiser
+  await createNotification({
+    recipient: event.owner,
+    type: 'ticket',
+    title: googleId ? 'New Google Registration!' : 'New Registration!',
+    message: `${name} has just registered for your event: ${event.title}`,
+    link: `/events/${event._id}/attendees`
+  });
+
+  // 8. Send Registration Email to Attendee
+  try {
+    const ticketType = ticket ? ticket.name : 'General Admission';
+    const amountPaid = expectedAmount > 0 ? `₦${expectedAmount}` : 'Free';
+
+    const htmlTemplate = generateRegistrationEmail({
+      name,
+      event,
+      ticketType,
+      orderId,
+      qrCodeUrl,
+      amountPaid,
+      attendeeId: attendee._id
+    });
+
+    await sendEmail({
+      email: email,
+      subject: `You’re In! Confirmation for ${event.title}`,
+      html: htmlTemplate
+    });
+
+  } catch (emailErr) {
+    console.error('[Core Register] Registration email sending error:', emailErr);
+  }
+
+  return { success: true, attendee };
+};
+
+exports.coreRegister = coreRegister;
+
+/**
  * @desc    Public registration for an event
  * @route   POST /api/attendee/register
  * @access  Public
  */
 exports.registerAttendee = async (req, res) => {
-  const { eventId, name, email, ticketId } = req.body;
+  const { eventId, name, email, ticketId, paymentReference, amount } = req.body;
 
   try {
-    // 1. Validate Event existence and status
-    const event = await Event.findById(eventId);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (event.status !== 'Published') {
-      return res.status(400).json({ message: 'Registration is not open for this event' });
+    // 1. Validate Ticket and Amount before verification
+    const ticket = ticketId ? await Ticket.findById(ticketId) : null;
+    const isDonation = ticket && ticket.type?.toLowerCase() === 'donation';
+    const expectedAmount = isDonation ? amount : (ticket ? ticket.price : 0);
+
+    // 2. Handle Payment Verification if needed
+    if (expectedAmount > 0) {
+      const verification = await verifyPaystackPayment(paymentReference, expectedAmount);
+      if (!verification.success) {
+        return res.status(400).json({ message: verification.message });
+      }
     }
 
-    // 2. Prevent duplicate registrations for same email + event
-    const existingRegistration = await Attendee.findOne({ eventId, email });
-    if (existingRegistration) {
+    // 3. Call Core Registration
+    const result = await coreRegister({ eventId, name, email, ticketId, paymentReference, amount: expectedAmount });
+    
+    if (result.alreadyRegistered) {
       return res.status(400).json({ message: 'You have already registered for this event' });
     }
 
-    // 3. Validate Ticket and Quantity
-    let ticket = null;
-    if (ticketId) {
-      // Use atomic update to decrement quantity only if it is > 0
-      ticket = await Ticket.findOneAndUpdate(
-        { _id: ticketId, eventId, quantity: { $gt: 0 } },
-        { $inc: { quantity: -1 } },
-        { new: true }
-      );
-
-      if (!ticket) {
-        return res.status(400).json({ message: 'Ticket is sold out or invalid' });
-      }
-
-      // Automatically mark as "Sold Out" if count hits 0
-      if (ticket.quantity === 0) {
-        ticket.status = 'Sold Out';
-        await ticket.save();
-      }
-    }
-
-    // 4. Create Attendee
-    const attendeeId = new mongoose.Types.ObjectId();
-    const orderId = `REG-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
-    
-    const attendee = new Attendee({
-      _id: attendeeId,
-      eventId,
-      ticketId,
-      name,
-      email,
-      orderId,
-      qrCode: qrCodeUrl,
-      status: 'pending'
-    });
-
-    await attendee.save();
-
-    // 5. Sync to Calendar (If user exists)
-    await syncToCalendar(email, event);
-
-    // 6. Notify Organiser
-    await createNotification({
-      recipient: event.owner,
-      type: 'ticket',
-      title: 'New Registration!',
-      message: `${name} has just registered for your event: ${event.title}`,
-      link: `/events/${event._id}/attendees`
-    });
-
-    // 6. Send Registration Email to Attendee
-    try {
-      const eventDate = new Date(event.startDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-      const ticketType = ticket ? ticket.name : 'General Admission';
-      const amountPaid = ticket && ticket.price ? `$${ticket.price}` : 'Free';
-
-      const htmlTemplate = generateRegistrationEmail({
-        name,
-        event,
-        ticketType,
-        orderId,
-        qrCodeUrl,
-        amountPaid,
-        attendeeId: attendee._id
-      });
-
-
-      await sendEmail({
-        email: email,
-        subject: `You’re In! Confirmation for ${event.title}`,
-        html: htmlTemplate
-      });
-
-    } catch (emailErr) {
-      console.error('[Register Attendee] Registration email sending error:', emailErr);
-    }
-
-    res.status(201).json(attendee);
+    res.status(201).json(result.attendee);
   } catch (error) {
     console.error('[Register Attendee] Error:', error);
-    res.status(500).send('Server Error');
+    res.status(error.message === 'Event not found' ? 404 : 400).json({ message: error.message || 'Server Error' });
   }
 };
 
@@ -175,7 +243,7 @@ exports.registerAttendee = async (req, res) => {
  * @access  Public
  */
 exports.googleRegisterAttendee = async (req, res) => {
-  const { eventId, idToken, ticketId } = req.body;
+  const { eventId, idToken, ticketId, paymentReference, amount } = req.body;
 
   try {
     // 1. Verify Google ID Token
@@ -187,98 +255,30 @@ exports.googleRegisterAttendee = async (req, res) => {
     const payload = ticketObj.getPayload();
     const { sub: googleId, email, name } = payload;
 
-    // 2. Validate Event existence and status
-    const event = await Event.findById(eventId);
-    if (!event) return res.status(404).json({ message: 'Event not found' });
-    if (event.status !== 'Published') {
-      return res.status(400).json({ message: 'Registration is not open for this event' });
+    // 2. Validate Ticket and Amount before verification
+    const ticket = ticketId ? await Ticket.findById(ticketId) : null;
+    const isDonation = ticket && ticket.type?.toLowerCase() === 'donation';
+    const expectedAmount = isDonation ? amount : (ticket ? ticket.price : 0);
+
+    // 3. Handle Payment Verification if needed
+    if (expectedAmount > 0) {
+      const verification = await verifyPaystackPayment(paymentReference, expectedAmount);
+      if (!verification.success) {
+        return res.status(400).json({ message: verification.message });
+      }
     }
 
-    // 3. Prevent duplicate registrations for same email + event
-    const existingRegistration = await Attendee.findOne({ eventId, email });
-    if (existingRegistration) {
+    // 4. Call Core Registration
+    const result = await coreRegister({ eventId, name, email, ticketId, paymentReference, amount: expectedAmount, googleId });
+    
+    if (result.alreadyRegistered) {
       return res.status(400).json({ message: 'You have already registered for this event' });
     }
 
-    // 4. Validate Ticket and Quantity
-    let ticket = null;
-    if (ticketId) {
-      ticket = await Ticket.findOneAndUpdate(
-        { _id: ticketId, eventId, quantity: { $gt: 0 } },
-        { $inc: { quantity: -1 } },
-        { new: true }
-      );
-
-      if (!ticket) {
-        return res.status(400).json({ message: 'Ticket is sold out or invalid' });
-      }
-
-      if (ticket.quantity === 0) {
-        ticket.status = 'Sold Out';
-        await ticket.save();
-      }
-    }
-
-    // 5. Create Attendee
-    const attendeeId = new mongoose.Types.ObjectId();
-    const orderId = `REG-G-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
-    
-    const attendee = new Attendee({
-      _id: attendeeId,
-      eventId,
-      ticketId,
-      name,
-      email,
-      googleId,
-      orderId,
-      qrCode: qrCodeUrl,
-      status: 'pending'
-    });
-
-    await attendee.save();
-
-    // 6. Sync to Calendar (If user exists)
-    await syncToCalendar(email, event);
-
-    // 7. Notify Organiser
-    await createNotification({
-      recipient: event.owner,
-      type: 'ticket',
-      title: 'New Google Registration!',
-      message: `${name} has just registered via Google for your event: ${event.title}`,
-      link: `/events/${event._id}/attendees`
-    });
-
-    // 7. Send Registration Email
-    try {
-      const ticketType = ticket ? ticket.name : 'General Admission';
-      const amountPaid = ticket && ticket.price ? `$${ticket.price}` : 'Free';
-
-      const htmlTemplate = generateRegistrationEmail({
-        name,
-        event,
-        ticketType,
-        orderId,
-        qrCodeUrl,
-        amountPaid,
-        attendeeId: attendee._id
-      });
-
-      await sendEmail({
-        email: email,
-        subject: `You’re In! Confirmation for ${event.title}`,
-        html: htmlTemplate
-      });
-
-    } catch (emailErr) {
-      console.error('[Google Register Attendee] Registration email sending error:', emailErr);
-    }
-
-    res.status(201).json(attendee);
+    res.status(201).json(result.attendee);
   } catch (error) {
     console.error('[Google Register Attendee] Error:', error);
-    res.status(401).json({ message: 'Invalid Google token' });
+    res.status(error.message === 'Event not found' ? 404 : 400).json({ message: error.message || 'Invalid Google token' });
   }
 };
 
