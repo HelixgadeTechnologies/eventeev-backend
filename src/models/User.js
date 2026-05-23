@@ -138,6 +138,29 @@ const UserSchema = new mongoose.Schema({
     type: String,
     select: false, // Don't include in normal queries for security
   },
+  teammates: [
+    {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      role: {
+        type: String,
+        enum: ['Organizer', 'Coordinator', 'Staff'],
+        required: true
+      },
+      status: {
+        type: String,
+        enum: ['Active', 'Pending'],
+        default: 'Pending'
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
   loginAttempts: {
     type: Number,
     required: true,

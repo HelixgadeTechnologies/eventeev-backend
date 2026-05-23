@@ -15,9 +15,10 @@ async function clearDummyData() {
     // 2. Find and delete provisional invited test users
     console.log('\n[1] Identifying invited provisional/unverified users...');
     const unverifiedInvitedUsers = await User.find({
-      firstName: 'Invited',
-      lastName: 'Collaborator',
-      isVerified: false
+      $or: [
+        { firstName: 'Invited', lastName: 'Collaborator', isVerified: false },
+        { firstName: 'Invited', lastName: 'Teammate', isVerified: false }
+      ]
     });
     
     console.log(`Found ${unverifiedInvitedUsers.length} provisional invited users in DB.`);
@@ -87,6 +88,33 @@ async function clearDummyData() {
     }
     
     console.log(`Completed collaborator cleanup. Total removed: ${totalCollaboratorsCleaned}.`);
+
+    // 6. Clean up orphaned teammates from ALL users
+    console.log('\n[5] Scanning users for orphaned teammates...');
+    const allUsers = await User.find({});
+    let totalTeammatesCleaned = 0;
+
+    for (const u of allUsers) {
+      if (u.teammates && u.teammates.length > 0) {
+        const initialCount = u.teammates.length;
+        
+        // Filter out teammates whose users were deleted, or are in our deletion list, or are null
+        u.teammates = u.teammates.filter(t => {
+          if (!t.user) return false;
+          const teammateUserId = t.user.toString();
+          return !uniqueUserIdsToDelete.includes(teammateUserId);
+        });
+
+        const cleanedCount = initialCount - u.teammates.length;
+        if (cleanedCount > 0) {
+          await u.save();
+          totalTeammatesCleaned += cleanedCount;
+          console.log(`User "${u.email}": Removed ${cleanedCount} test/orphaned teammate(s).`);
+        }
+      }
+    }
+    
+    console.log(`Completed teammate cleanup. Total removed: ${totalTeammatesCleaned}.`);
 
     console.log('\n🎉 DATABASE DUMMY DATA CLEANUP COMPLETED SUCCESSFULLY! 🎉');
 

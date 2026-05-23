@@ -39,6 +39,11 @@ router.get('/me', auth, userController.getMe);
  */
 router.get('/all', auth, userController.getAllUsers);
 
+// Teammate management routes
+router.get('/teammates', auth, userController.getTeammates);
+router.post('/teammates', auth, userController.inviteTeammate);
+router.delete('/teammates/:userId', auth, userController.removeTeammate);
+
 /**
  * @openapi
  * /api/user/{id}:

@@ -79,3 +79,173 @@ exports.getAllUsers = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+const crypto = require('crypto');
+
+/**
+ * @desc    Get all teammates under the logged in user's workspace
+ * @route   GET /api/user/teammates
+ * @access  Private
+ */
+exports.getTeammates = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .populate('teammates.user', 'firstName lastName email avatar');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Always structure the workspace teammates starting with the Owner
+    const ownerRecord = {
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        avatar: user.avatar
+      },
+      role: 'Owner',
+      status: 'Active',
+      addedAt: user.createdAt
+    };
+
+    const teamList = [ownerRecord, ...user.teammates];
+    res.json(teamList);
+  } catch (error) {
+    console.error('[Get Teammates] Error:', error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Invite a teammate to join the workspace team
+ * @route   POST /api/user/teammates
+ * @access  Private
+ */
+exports.inviteTeammate = async (req, res) => {
+  const { email, role } = req.body;
+
+  if (!email || !role) {
+    return res.status(400).json({ message: 'Please provide email and role' });
+  }
+
+  if (!['Organizer', 'Coordinator', 'Staff'].includes(role)) {
+    return res.status(400).json({ message: 'Role must be Organizer, Coordinator, or Staff' });
+  }
+
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // 1. Prevent inviting yourself
+    if (currentUser.email === email.toLowerCase().trim()) {
+      return res.status(400).json({ message: 'You cannot invite yourself to your own team' });
+    }
+
+    // 2. Check if user already exists
+    let targetUser = await User.findOne({ email: email.toLowerCase().trim() });
+
+    if (targetUser) {
+      // Check if already a teammate
+      const isAlreadyTeammate = currentUser.teammates.some(
+        (t) => t.user.toString() === targetUser._id.toString()
+      );
+      if (isAlreadyTeammate) {
+        return res.status(400).json({ message: 'User is already a teammate in your workspace' });
+      }
+
+      // Add to teammates
+      currentUser.teammates.push({ user: targetUser._id, role, status: 'Active' });
+      await currentUser.save();
+
+      return res.status(200).json({
+        message: 'Teammate added successfully',
+        teammate: {
+          user: {
+            id: targetUser._id,
+            firstName: targetUser.firstName,
+            lastName: targetUser.lastName,
+            email: targetUser.email,
+            avatar: targetUser.avatar
+          },
+          role,
+          status: 'Active',
+          addedAt: new Date()
+        }
+      });
+    } else {
+      // 3. Create a provisional/unverified teammate account
+      const tempPassword = crypto.randomBytes(8).toString('hex');
+      const randomAvatarId = Math.floor(Math.random() * 4) + 1;
+
+      targetUser = new User({
+        firstName: 'Invited',
+        lastName: 'Teammate',
+        email: email.toLowerCase().trim(),
+        password: tempPassword,
+        avatar: `/avatars/avatar_${randomAvatarId}.png`,
+        isVerified: false,
+        role: 'user'
+      });
+
+      await targetUser.save();
+
+      // Add to teammates as Pending
+      currentUser.teammates.push({ user: targetUser._id, role, status: 'Pending' });
+      await currentUser.save();
+
+      return res.status(201).json({
+        message: 'Teammate invited successfully. Provisional account created.',
+        teammate: {
+          user: {
+            id: targetUser._id,
+            firstName: targetUser.firstName,
+            lastName: targetUser.lastName,
+            email: targetUser.email,
+            avatar: targetUser.avatar
+          },
+          role,
+          status: 'Pending',
+          addedAt: new Date()
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[Invite Teammate] Error:', error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Remove a teammate from the workspace team
+ * @route   DELETE /api/user/teammates/:userId
+ * @access  Private
+ */
+exports.removeTeammate = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const teammateIndex = currentUser.teammates.findIndex(
+      (t) => t.user.toString() === req.params.userId
+    );
+
+    if (teammateIndex === -1) {
+      return res.status(404).json({ message: 'Teammate not found in this workspace' });
+    }
+
+    currentUser.teammates.splice(teammateIndex, 1);
+    await currentUser.save();
+
+    res.json({ message: 'Teammate removed successfully' });
+  } catch (error) {
+    console.error('[Remove Teammate] Error:', error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
