@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { check } = require('express-validator');
 const eventController = require('../controllers/eventController');
+const collaboratorController = require('../controllers/collaboratorController');
 const auth = require('../middleware/auth');
 
 /**
@@ -194,5 +195,100 @@ router.put('/:id', auth, eventController.updateEvent);
  *         description: Event deleted
  */
 router.delete('/:id', auth, eventController.deleteEvent);
+
+/**
+ * @openapi
+ * /api/event/{id}/collaborators:
+ *   post:
+ *     tags: [Events]
+ *     summary: Add or invite a collaborator (manager/monitor) to an event
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, role]
+ *             properties:
+ *               email: { type: string, format: email }
+ *               role: { type: string, enum: [manager, monitor] }
+ *     responses:
+ *       200:
+ *         description: Existing collaborator added successfully
+ *       201:
+ *         description: New collaborator invited successfully
+ *   get:
+ *     tags: [Events]
+ *     summary: Get all collaborators for an event
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+router.post('/:id/collaborators', auth, collaboratorController.addCollaborator);
+router.get('/:id/collaborators', auth, collaboratorController.getCollaborators);
+
+/**
+ * @openapi
+ * /api/event/{id}/collaborators/{userId}:
+ *   patch:
+ *     tags: [Events]
+ *     summary: Update collaborator role
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [role]
+ *             properties:
+ *               role: { type: string, enum: [manager, monitor] }
+ *     responses:
+ *       200:
+ *         description: Success
+ *   delete:
+ *     tags: [Events]
+ *     summary: Remove collaborator
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+router.patch('/:id/collaborators/:userId', auth, collaboratorController.updateCollaborator);
+router.delete('/:id/collaborators/:userId', auth, collaboratorController.removeCollaborator);
 
 module.exports = router;

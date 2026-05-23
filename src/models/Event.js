@@ -139,6 +139,24 @@ const EventSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  collaborators: [
+    {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      role: {
+        type: String,
+        enum: ['manager', 'monitor'],
+        required: true
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now,
