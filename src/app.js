@@ -15,8 +15,15 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(helmet());
 
 // Restrict CORS to specific frontend origin
+const allowedOrigins = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [];
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || '*', // Fallback to all for now if env is missing, but env should have it
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
@@ -72,10 +79,28 @@ app.use('/api/notification', require('./routes/notification'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/payment', require('./routes/payment'));
 
+const Sentry = require('@sentry/node');
+Sentry.setupExpressErrorHandler(app);
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
+  
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({ error: Object.values(err.errors).map(val => val.message) });
+  }
+  
+  if (err.name === 'UnauthorizedError' || err.name === 'JsonWebTokenError') {
+    return res.status(401).json({ error: 'Unauthorized Access' });
+  }
+
+  const status = err.statusCode || 500;
+  const message = err.message || 'Something went wrong!';
+  
+  res.status(status).json({ 
+    error: message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 module.exports = app;

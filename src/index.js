@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./instrument');
 const http = require('http');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
@@ -20,7 +21,8 @@ const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
   console.error('[CRITICAL] Missing required environment variables:', missingEnvVars.join(', '));
-  console.error('[CRITICAL] Authentication and Database features may fail!');
+  console.error('[CRITICAL] Authentication and Database features will fail! Exiting process.');
+  process.exit(1);
 } else {
   console.log('[SUCCESS] All required environment variables are present.');
 }

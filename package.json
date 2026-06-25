@@ -6,12 +6,17 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "echo 'No build step required for this Node.js app'",
+    "test": "jest",
+    "lint": "eslint src/**/*.js",
+    "format": "prettier --write \"src/**/*.js\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@sentry/node": "^8.0.0",
+    "@sentry/profiling-node": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
