@@ -16,19 +16,8 @@ app.use(helmet());
 
 // Restrict CORS to specific frontend origin
 const corsOptions = {
-  origin: function (origin, callback) {
-    const allowedOrigins = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : [];
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is allowed (can support multiple domains separated by comma)
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
-      callback(null, true);
-    } else {
-      callback(null, false); // Block gracefully instead of throwing 500 error
-    }
-  },
+  origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : '*',
+  credentials: true,
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
