@@ -54,7 +54,9 @@ exports.getPublicEventBySlug = async (req, res) => {
     const schedule = await Schedule.find({ event: event._id }).sort({ startTime: 1 });
 
     // Construct response with shareable URL (fallback to ID if slug is missing)
-    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+    const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+    const imageUrl = event.thumbnailImage || event.bannerImage || '';
+    const publicUrl = imageUrl ? `${baseUrl}?image=${encodeURIComponent(imageUrl)}` : baseUrl;
 
     res.json({
       ...event._doc,
@@ -375,7 +377,9 @@ exports.getEventById = async (req, res) => {
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
-    const publicUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+    const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+    const imageUrl = event.thumbnailImage || event.bannerImage || '';
+    const publicUrl = imageUrl ? `${baseUrl}?image=${encodeURIComponent(imageUrl)}` : baseUrl;
     const schedule = await Schedule.find({ event: event._id }).sort({ startTime: 1 });
     
     res.json({
