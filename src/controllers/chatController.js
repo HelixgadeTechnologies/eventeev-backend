@@ -54,10 +54,27 @@ exports.getRooms = async (req, res) => {
  */
 exports.getMessages = async (req, res) => {
   try {
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const startIndex = (page - 1) * limit;
+
+    const total = await Message.countDocuments({ room: req.params.roomId });
     const messages = await Message.find({ room: req.params.roomId })
       .populate('sender', 'name avatar')
-      .sort({ createdAt: 1 });
-    res.json(messages);
+      .sort({ createdAt: -1 })
+      .skip(startIndex)
+      .limit(limit);
+
+    res.json({
+      data: messages.reverse(), // reverse back to chronological order for chat UI
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
+    });
   } catch (error) {
     console.error(error.message);
     res.status(500).send('Server Error');

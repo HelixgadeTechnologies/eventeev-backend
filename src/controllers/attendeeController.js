@@ -157,7 +157,17 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
     status: 'verified' 
   });
 
-  await attendee.save();
+  try {
+    await attendee.save();
+  } catch (err) {
+    // E11000 duplicate key error means race condition occurred
+    if (err.code === 11000) {
+      console.log(`[Core Register] Caught race condition for duplicate registration: ${email}`);
+      const existing = await Attendee.findOne({ eventId, email });
+      return { alreadyRegistered: true, attendee: existing };
+    }
+    throw err;
+  }
 
   // 6. Sync to Calendar (If user exists)
   await syncToCalendar(email, event);
@@ -310,9 +320,26 @@ exports.getAttendeesByEvent = async (req, res) => {
       return res.status(403).json({ message: 'User not authorized to access this event\'s attendees' });
     }
 
-    const attendees = await Attendee.find(query).sort({ registrationDate: -1 });
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const startIndex = (page - 1) * limit;
 
-    res.json(attendees);
+    const total = await Attendee.countDocuments(query);
+    const attendees = await Attendee.find(query)
+      .sort({ registrationDate: -1 })
+      .skip(startIndex)
+      .limit(limit);
+
+    res.json({
+      data: attendees,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
+    });
   } catch (error) {
     res.status(500).send('Server Error');
   }

@@ -133,11 +133,13 @@ const EventSchema = new mongoose.Schema({
     type: String,
     enum: ['Draft', 'Published', 'Completed'],
     default: 'Draft',
+    index: true,
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+    index: true,
   },
   collaborators: [
     {

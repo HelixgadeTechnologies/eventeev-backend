@@ -32,6 +32,7 @@ const RoomSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
     required: true,
+    index: true,
   },
   name: {
     type: String,
@@ -45,6 +46,12 @@ const RoomSchema = new mongoose.Schema({
   leadParticipant: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
   },
   createdAt: {
     type: Date,

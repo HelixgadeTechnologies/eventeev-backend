@@ -45,6 +45,7 @@ const AttendeeSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
     required: true,
+    index: true,
   },
   ticketId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -57,6 +58,7 @@ const AttendeeSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, 'Please add an email'],
+    index: true,
   },
   orderId: {
     type: String,
@@ -92,5 +94,7 @@ const AttendeeSchema = new mongoose.Schema({
   },
 });
 
+// Prevent duplicate registrations for the same event
+AttendeeSchema.index({ eventId: 1, email: 1 }, { unique: true });
 
 module.exports = mongoose.model('Attendee', AttendeeSchema);

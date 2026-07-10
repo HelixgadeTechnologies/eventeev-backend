@@ -46,6 +46,7 @@ const PollSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
     required: true,
+    index: true,
   },
   title: {
     type: String,
