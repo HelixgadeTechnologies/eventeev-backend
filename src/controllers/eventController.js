@@ -78,7 +78,15 @@ exports.getPublicEventBySlug = async (req, res) => {
  */
 exports.getPublishedEvents = async (req, res) => {
   try {
-    const events = await Event.find({ status: 'Published' });
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const startIndex = (page - 1) * limit;
+
+    const total = await Event.countDocuments({ status: 'Published' });
+    const events = await Event.find({ status: 'Published' })
+      .skip(startIndex)
+      .limit(limit);
     
     // Check for expiration on-the-fly to ensure UI accuracy
     const updatedEvents = [];
@@ -91,7 +99,15 @@ exports.getPublishedEvents = async (req, res) => {
       }
     }
 
-    res.json(updatedEvents);
+    res.json({
+      data: updatedEvents,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
+    });
   } catch (error) {
     res.status(500).send('Server Error');
   }
@@ -133,7 +149,16 @@ exports.getEventListing = async (req, res) => {
       query.startDate.$lte = endOfMonth;
     }
 
-    const events = await Event.find(query).sort({ startDate: 1 });
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const startIndex = (page - 1) * limit;
+
+    const total = await Event.countDocuments(query);
+    const events = await Event.find(query)
+      .sort({ startDate: 1 })
+      .skip(startIndex)
+      .limit(limit);
     
     // Check for expiration on-the-fly
     const updatedEvents = [];
@@ -146,7 +171,15 @@ exports.getEventListing = async (req, res) => {
       }
     }
 
-    res.json(updatedEvents);
+    res.json({
+      data: updatedEvents,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
+    });
 
   } catch (error) {
     console.error('[Get Event Listing] Error:', error);
