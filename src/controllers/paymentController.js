@@ -64,3 +64,69 @@ exports.handlePaystackWebhook = async (req, res) => {
     res.status(500).send('Webhook Error');
   }
 };
+
+const Event = require('../models/Event');
+const Ticket = require('../models/Ticket');
+
+/**
+ * @desc    Initialize Paystack Transaction
+ * @route   POST /api/payment/initialize
+ * @access  Public
+ */
+exports.initializePayment = async (req, res) => {
+  const { email, amount, eventId, ticketId, name, callback_url } = req.body;
+
+  try {
+    // 1. Validate Event
+    const event = await Event.findById(eventId);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (event.status !== 'Published') return res.status(400).json({ message: 'Registration is not open for this event' });
+
+    // 2. Validate Ticket
+    if (ticketId) {
+      const ticket = await Ticket.findById(ticketId);
+      if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+      if (ticket.quantity <= 0) return res.status(400).json({ message: 'Ticket is sold out' });
+    }
+
+    // 3. Initialize Paystack Transaction
+    // Paystack expects amount in kobo/cents
+    const amountInKobo = Math.round(amount * 100);
+
+    const payload = {
+      email,
+      amount: amountInKobo,
+      metadata: {
+        eventId,
+        ticketId,
+        name,
+        // Passing cancel_action helps users go back to event page if they cancel
+      }
+    };
+
+    if (callback_url) {
+      payload.callback_url = callback_url;
+    }
+
+    const response = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (!result.status) {
+      return res.status(400).json({ message: result.message || 'Failed to initialize payment' });
+    }
+
+    // result.data contains authorization_url, access_code, reference
+    res.json(result.data);
+  } catch (error) {
+    console.error('[Initialize Payment] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
