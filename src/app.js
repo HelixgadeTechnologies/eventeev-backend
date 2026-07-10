@@ -72,6 +72,7 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/notification', require('./routes/notification'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/payment', require('./routes/payment'));
+app.use('/api/networking', require('./routes/networking'));
 
 const Sentry = require('@sentry/node');
 Sentry.setupExpressErrorHandler(app);

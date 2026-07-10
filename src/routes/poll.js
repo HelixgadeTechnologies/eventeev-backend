@@ -97,6 +97,8 @@ router.get('/:id', pollController.getPollResults);
  */
 router.patch('/:id/status', auth, pollController.updatePollStatus);
 
+const multiAuth = require('../middleware/multiAuth');
+
 /**
  * @openapi
  * /api/poll/{id}/vote:
@@ -125,7 +127,8 @@ router.patch('/:id/status', auth, pollController.updatePollStatus);
  *       200:
  *         description: Vote submitted
  */
-router.post('/:id/vote', auth, pollController.submitVote);
+router.post('/:id/vote', multiAuth, pollController.submitVote);
+
 
 /**
  * @openapi

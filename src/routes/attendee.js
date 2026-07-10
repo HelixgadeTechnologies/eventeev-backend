@@ -174,5 +174,44 @@ router.post('/google-register', attendeeController.googleRegisterAttendee);
  */
 router.get('/ticket/:id/download', attendeeController.downloadTicketPDF);
 
-module.exports = router;
+const attendeeAuth = require('../middleware/attendeeAuth');
 
+/**
+ * @openapi
+ * /api/attendee/login:
+ *   post:
+ *     tags: [Attendees]
+ *     summary: Login for an attendee using Email and Order ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, orderId]
+ *             properties:
+ *               email: { type: string }
+ *               orderId: { type: string }
+ *     responses:
+ *       200:
+ *         description: Login successful, returns token
+ *       400:
+ *         description: Invalid credentials
+ */
+router.post('/login', attendeeController.loginAttendee);
+
+/**
+ * @openapi
+ * /api/attendee/my-events:
+ *   get:
+ *     tags: [Attendees]
+ *     summary: Get all events registered by the authenticated attendee
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of attendee records with event details
+ */
+router.get('/my-events', attendeeAuth, attendeeController.getMyEvents);
+
+module.exports = router;

@@ -518,3 +518,64 @@ exports.downloadTicketPDF = async (req, res) => {
   }
 };
 
+const jwt = require('jsonwebtoken');
+
+/**
+ * @desc    Login attendee
+ * @route   POST /api/attendee/login
+ * @access  Public
+ */
+exports.loginAttendee = async (req, res) => {
+  const { email, orderId } = req.body;
+
+  try {
+    const attendee = await Attendee.findOne({ email, orderId });
+
+    if (!attendee) {
+      return res.status(400).json({ message: 'Invalid Credentials' });
+    }
+
+    const payload = {
+      attendee: {
+        id: attendee.id,
+        email: attendee.email
+      }
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token, attendee });
+      }
+    );
+  } catch (error) {
+    console.error('[Login Attendee] Error:', error);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Get all events for an attendee
+ * @route   GET /api/attendee/my-events
+ * @access  Private (Attendee)
+ */
+exports.getMyEvents = async (req, res) => {
+  try {
+    // req.attendee is set by attendeeAuth middleware
+    const email = req.attendee.email;
+    
+    // Find all attendee records for this email and populate event details
+    const attendees = await Attendee.find({ email })
+      .populate('eventId', 'title startDate endDate location status')
+      .populate('ticketId', 'name price');
+
+    res.json(attendees);
+  } catch (error) {
+    console.error('[Get My Events] Error:', error);
+    res.status(500).send('Server Error');
+  }
+};
+

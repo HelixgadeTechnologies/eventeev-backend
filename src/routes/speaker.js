@@ -26,8 +26,8 @@ const auth = require('../middleware/auth');
  *               items:
  *                 $ref: '#/components/schemas/Speaker'
  */
-router.get('/event/:eventId', auth, speakerController.getSpeakersByEvent);
-router.get('/event/:eventId/stats', auth, speakerController.getSpeakerStats);
+router.get('/event/:eventId', speakerController.getSpeakersByEvent);
+router.get('/event/:eventId/stats', speakerController.getSpeakerStats);
 
 
 /**
@@ -68,7 +68,7 @@ router.post('/create', auth, speakerController.createSpeaker);
  *             schema:
  *               $ref: '#/components/schemas/Speaker'
  */
-router.get('/:id', auth, speakerController.getSpeaker);
+router.get('/:id', speakerController.getSpeaker);
 
 /**
  * @openapi

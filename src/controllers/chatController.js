@@ -63,3 +63,33 @@ exports.getMessages = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Send a message to a room
+ * @route   POST /api/chat/messages/:roomId
+ * @access  Private (MultiAuth)
+ */
+exports.sendMessage = async (req, res) => {
+  const { content } = req.body;
+  try {
+    const room = await Room.findById(req.params.roomId);
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+
+    const senderId = req.user ? req.user.id : req.attendee.id;
+
+    const message = new Message({
+      room: req.params.roomId,
+      sender: senderId,
+      content
+    });
+
+    await message.save();
+
+    res.status(201).json(message);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};

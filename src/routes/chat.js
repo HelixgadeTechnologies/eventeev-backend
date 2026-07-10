@@ -23,6 +23,8 @@ const auth = require('../middleware/auth');
  */
 router.post('/room', auth, chatController.createRoom);
 
+const multiAuth = require('../middleware/multiAuth');
+
 /**
  * @openapi
  * /api/chat/rooms/{eventId}:
@@ -44,7 +46,7 @@ router.post('/room', auth, chatController.createRoom);
  *               items:
  *                 $ref: '#/components/schemas/Room'
  */
-router.get('/rooms/:eventId', auth, chatController.getRooms);
+router.get('/rooms/:eventId', multiAuth, chatController.getRooms);
 
 /**
  * @openapi
@@ -67,6 +69,33 @@ router.get('/rooms/:eventId', auth, chatController.getRooms);
  *               items:
  *                 $ref: '#/components/schemas/Message'
  */
-router.get('/messages/:roomId', auth, chatController.getMessages);
+router.get('/messages/:roomId', multiAuth, chatController.getMessages);
+
+/**
+ * @openapi
+ * /api/chat/messages/{roomId}:
+ *   post:
+ *     tags: [Chat]
+ *     summary: Send a message to a room
+ *     parameters:
+ *       - in: path
+ *         name: roomId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [content]
+ *             properties:
+ *               content: { type: string }
+ *     responses:
+ *       201:
+ *         description: Message sent
+ */
+router.post('/messages/:roomId', multiAuth, chatController.sendMessage);
 
 module.exports = router;
+
