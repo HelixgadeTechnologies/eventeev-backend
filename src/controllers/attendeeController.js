@@ -157,7 +157,17 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
     status: 'verified' 
   });
 
-  await attendee.save();
+  try {
+    await attendee.save();
+  } catch (err) {
+    // E11000 duplicate key error means race condition occurred
+    if (err.code === 11000) {
+      console.log(`[Core Register] Caught race condition for duplicate registration: ${email}`);
+      const existing = await Attendee.findOne({ eventId, email });
+      return { alreadyRegistered: true, attendee: existing };
+    }
+    throw err;
+  }
 
   // 6. Sync to Calendar (If user exists)
   await syncToCalendar(email, event);
