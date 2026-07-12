@@ -75,6 +75,10 @@ const EventSchema = new mongoose.Schema({
     type: String,
     unique: true,
   },
+  connectCode: {
+    type: String,
+    unique: true,
+  },
   description: {
     type: String,
     required: [true, 'Please add a description'],
@@ -165,26 +169,60 @@ const EventSchema = new mongoose.Schema({
   },
 });
 
-// Create event slug from the title
-EventSchema.pre('save', async function () {
-  // Generate slug if title is modified OR slug is missing
-  if (!this.isModified('title') && this.slug) {
-    return;
-  }
+// Helper to generate connect code
+function generateConnectCodePrefix(title) {
+  // Take first 4 alphanumeric characters, uppercase them. Pad with 'X' if less than 4.
+  const clean = title.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const prefix = (clean + 'XXXX').slice(0, 4);
+  return prefix;
+}
 
-  let generatedSlug = slugify(this.title);
-  
-  // Check for slug uniqueness
-  let slugExists = await this.constructor.findOne({ slug: generatedSlug });
-  let counter = 1;
-  
-  while (slugExists && slugExists._id.toString() !== this._id.toString()) {
-    generatedSlug = `${slugify(this.title)}-${counter}`;
-    slugExists = await this.constructor.findOne({ slug: generatedSlug });
-    counter++;
+function generateRandomString(length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  
-  this.slug = generatedSlug;
+  return result;
+}
+
+// Create event slug and connect code from the title
+EventSchema.pre('save', async function (next) {
+  try {
+    // Generate slug if title is modified OR slug is missing
+    if (this.isModified('title') || !this.slug) {
+      let generatedSlug = slugify(this.title);
+      let slugExists = await this.constructor.findOne({ slug: generatedSlug });
+      let counter = 1;
+      
+      while (slugExists && slugExists._id.toString() !== this._id.toString()) {
+        generatedSlug = `${slugify(this.title)}-${counter}`;
+        slugExists = await this.constructor.findOne({ slug: generatedSlug });
+        counter++;
+      }
+      this.slug = generatedSlug;
+    }
+
+    // Generate connect code if missing
+    if (!this.connectCode) {
+      const prefix = generateConnectCodePrefix(this.title);
+      let newConnectCode = '';
+      let codeExists = true;
+
+      while (codeExists) {
+        newConnectCode = `${prefix}-${generateRandomString(4)}`;
+        const existingEvent = await this.constructor.findOne({ connectCode: newConnectCode });
+        if (!existingEvent) {
+          codeExists = false;
+        }
+      }
+      this.connectCode = newConnectCode;
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = mongoose.model('Event', EventSchema);

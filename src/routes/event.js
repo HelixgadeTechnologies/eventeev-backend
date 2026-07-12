@@ -35,6 +35,7 @@ const auth = require('../middleware/auth');
  */
 router.get('/listing', eventController.getEventListing);
 router.get('/public/:slug', eventController.getPublicEventBySlug);
+router.post('/connect', eventController.connectToEvent);
 
 /**
  * @openapi

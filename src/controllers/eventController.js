@@ -5,6 +5,7 @@ const Speaker = require('../models/Speaker');
 const Schedule = require('../models/Schedule');
 const Room = require('../models/Room');
 const User = require('../models/User');
+const Attendee = require('../models/Attendee');
 const { addEventToGoogleCalendar } = require('../utils/googleCalendar');
 const { isEventExpired } = require('../utils/eventStatus');
 
@@ -55,8 +56,7 @@ exports.getPublicEventBySlug = async (req, res) => {
 
     // Construct response with shareable URL (fallback to ID if slug is missing)
     const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
-    const imageUrl = event.thumbnailImage || event.bannerImage || '';
-    const publicUrl = imageUrl ? `${baseUrl}?image=${encodeURIComponent(imageUrl)}` : baseUrl;
+    const publicUrl = baseUrl;
 
     res.json({
       ...event._doc,
@@ -411,8 +411,7 @@ exports.getEventById = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
-    const imageUrl = event.thumbnailImage || event.bannerImage || '';
-    const publicUrl = imageUrl ? `${baseUrl}?image=${encodeURIComponent(imageUrl)}` : baseUrl;
+    const publicUrl = baseUrl;
     const schedule = await Schedule.find({ event: event._id }).sort({ startTime: 1 });
     
     res.json({
@@ -471,5 +470,65 @@ exports.generateICS = async (req, res) => {
   } catch (error) {
     console.error('[Generate ICS] Error:', error);
     res.status(500).send('Error generating calendar file');
+  }
+};
+
+/**
+ * @desc    Connect to event via connect code
+ * @route   POST /api/event/connect
+ * @access  Public
+ */
+exports.connectToEvent = async (req, res) => {
+  try {
+    const { connectCode, email } = req.body;
+
+    if (!connectCode || !email) {
+      return res.status(400).json({ message: 'Please provide both connect code and email' });
+    }
+
+    // Find the event by connect code
+    const event = await Event.findOne({ connectCode: connectCode.toUpperCase() });
+    
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found with the provided code' });
+    }
+
+    const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+
+    // Check if user is registered for this event
+    const attendee = await Attendee.findOne({ 
+      eventId: event._id, 
+      email: email.toLowerCase() 
+    });
+
+    if (attendee) {
+      // User is registered
+      return res.json({
+        isRegistered: true,
+        eventId: event._id,
+        attendeeId: attendee._id,
+        publicUrl: baseUrl,
+        message: 'Successfully verified registration',
+        event: {
+          title: event.title,
+          startDate: event.startDate,
+          location: event.location
+        }
+      });
+    } else {
+      // User is not registered
+      return res.json({
+        isRegistered: false,
+        eventId: event._id,
+        publicUrl: baseUrl,
+        message: 'Not registered for this event. Redirecting to registration...',
+        event: {
+          title: event.title
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[Connect To Event] Error:', error);
+    res.status(500).send('Server Error');
   }
 };
