@@ -66,6 +66,8 @@ exports.handlePaystackWebhook = async (req, res) => {
 };
 
 const Event = require('../models/Event');
+const Attendee = require('../models/Attendee');
+const mongoose = require('mongoose');
 const Ticket = require('../models/Ticket');
 
 /**
@@ -121,6 +123,36 @@ exports.initializePayment = async (req, res) => {
 
     if (!result.status) {
       return res.status(400).json({ message: result.message || 'Failed to initialize payment' });
+    }
+
+    // 4. Create or Update Pending Attendee
+    const existingRegistration = await Attendee.findOne({ eventId, email });
+    if (existingRegistration) {
+      if (existingRegistration.status === 'pending') {
+        existingRegistration.paymentReference = result.data.reference;
+        existingRegistration.amount = amount;
+        await existingRegistration.save();
+      } else {
+        return res.status(400).json({ message: 'You have already registered for this event' });
+      }
+    } else {
+      const attendeeId = new mongoose.Types.ObjectId();
+      const orderId = `REG-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
+      
+      const pendingAttendee = new Attendee({
+        _id: attendeeId,
+        eventId,
+        ticketId,
+        name,
+        email,
+        orderId,
+        qrCode: qrCodeUrl,
+        paymentReference: result.data.reference,
+        amount: amount,
+        status: 'pending' 
+      });
+      await pendingAttendee.save();
     }
 
     // result.data contains authorization_url, access_code, reference

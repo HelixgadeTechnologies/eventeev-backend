@@ -107,7 +107,7 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
 
   // 2. Prevent duplicate registrations for same email + event
   const existingRegistration = await Attendee.findOne({ eventId, email });
-  if (existingRegistration) {
+  if (existingRegistration && existingRegistration.status === 'verified') {
     return { alreadyRegistered: true, attendee: existingRegistration };
   }
 
@@ -136,26 +136,36 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
   const isDonation = ticket && ticket.type?.toLowerCase() === 'donation';
   const expectedAmount = isDonation ? amount : (ticket ? ticket.price : 0);
 
-  // 5. Create Attendee
-  const attendeeId = new mongoose.Types.ObjectId();
-  const orderId = googleId 
-    ? `REG-G-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`
-    : `REG-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
+  // 5. Create or Update Attendee
+  let attendee = existingRegistration;
   
-  const attendee = new Attendee({
-    _id: attendeeId,
-    eventId,
-    ticketId,
-    name,
-    email,
-    googleId,
-    orderId,
-    qrCode: qrCodeUrl,
-    paymentReference,
-    amount: expectedAmount,
-    status: 'verified' 
-  });
+  if (attendee && attendee.status === 'pending') {
+    attendee.ticketId = ticketId;
+    attendee.paymentReference = paymentReference;
+    attendee.amount = expectedAmount;
+    attendee.status = 'verified';
+    attendee.googleId = googleId;
+  } else {
+    const attendeeId = new mongoose.Types.ObjectId();
+    const orderId = googleId 
+      ? `REG-G-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`
+      : `REG-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
+    
+    attendee = new Attendee({
+      _id: attendeeId,
+      eventId,
+      ticketId,
+      name,
+      email,
+      googleId,
+      orderId,
+      qrCode: qrCodeUrl,
+      paymentReference,
+      amount: expectedAmount,
+      status: 'verified' 
+    });
+  }
 
   try {
     await attendee.save();
@@ -306,6 +316,55 @@ exports.getAttendeesByEvent = async (req, res) => {
     if (status && status !== 'All') {
       query.status = status.toLowerCase();
     }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Check if user owns the event
+    const event = await Event.findById(req.params.eventId);
+    if (!event || event.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to access this event\'s attendees' });
+    }
+
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const startIndex = (page - 1) * limit;
+
+    const total = await Attendee.countDocuments(query);
+    const attendees = await Attendee.find(query)
+      .sort({ registrationDate: -1 })
+      .skip(startIndex)
+      .limit(limit);
+
+    res.json({
+      data: attendees,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
+    });
+  } catch (error) {
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Get paid attendees for an event
+ * @route   GET /api/attendee/event/:eventId/paid
+ * @access  Private
+ */
+exports.getPaidAttendeesByEvent = async (req, res) => {
+  try {
+    const { search } = req.query;
+    // We only want attendees where amount > 0 and status is verified
+    let query = { eventId: req.params.eventId, amount: { $gt: 0 }, status: 'verified' };
 
     if (search) {
       query.$or = [
