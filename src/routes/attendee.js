@@ -30,6 +30,30 @@ router.get('/event/:eventId', auth, attendeeController.getAttendeesByEvent);
 
 /**
  * @openapi
+ * /api/attendee/event/{eventId}/paid:
+ *   get:
+ *     tags: [Attendees]
+ *     summary: Get all paid attendees for an event
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Attendee'
+ */
+router.get('/event/:eventId/paid', auth, attendeeController.getPaidAttendeesByEvent);
+
+/**
+ * @openapi
  * /api/attendee/event/{eventId}/stats:
  *   get:
  *     tags: [Attendees]
