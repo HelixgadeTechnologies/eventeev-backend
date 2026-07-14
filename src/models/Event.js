@@ -187,41 +187,35 @@ function generateRandomString(length) {
 }
 
 // Create event slug and connect code from the title
-EventSchema.pre('save', async function (next) {
-  try {
-    // Generate slug if title is modified OR slug is missing
-    if (this.isModified('title') || !this.slug) {
-      let generatedSlug = slugify(this.title);
-      let slugExists = await this.constructor.findOne({ slug: generatedSlug });
-      let counter = 1;
-      
-      while (slugExists && slugExists._id.toString() !== this._id.toString()) {
-        generatedSlug = `${slugify(this.title)}-${counter}`;
-        slugExists = await this.constructor.findOne({ slug: generatedSlug });
-        counter++;
-      }
-      this.slug = generatedSlug;
+EventSchema.pre('save', async function () {
+  // Generate slug if title is modified OR slug is missing
+  if (this.isModified('title') || !this.slug) {
+    let generatedSlug = slugify(this.title);
+    let slugExists = await this.constructor.findOne({ slug: generatedSlug });
+    let counter = 1;
+    
+    while (slugExists && slugExists._id.toString() !== this._id.toString()) {
+      generatedSlug = `${slugify(this.title)}-${counter}`;
+      slugExists = await this.constructor.findOne({ slug: generatedSlug });
+      counter++;
     }
+    this.slug = generatedSlug;
+  }
 
-    // Generate connect code if missing
-    if (!this.connectCode) {
-      const prefix = generateConnectCodePrefix(this.title);
-      let newConnectCode = '';
-      let codeExists = true;
+  // Generate connect code if missing
+  if (!this.connectCode) {
+    const prefix = generateConnectCodePrefix(this.title);
+    let newConnectCode = '';
+    let codeExists = true;
 
-      while (codeExists) {
-        newConnectCode = `${prefix}-${generateRandomString(4)}`;
-        const existingEvent = await this.constructor.findOne({ connectCode: newConnectCode });
-        if (!existingEvent) {
-          codeExists = false;
-        }
+    while (codeExists) {
+      newConnectCode = `${prefix}-${generateRandomString(4)}`;
+      const existingEvent = await this.constructor.findOne({ connectCode: newConnectCode });
+      if (!existingEvent) {
+        codeExists = false;
       }
-      this.connectCode = newConnectCode;
     }
-
-    next();
-  } catch (error) {
-    next(error);
+    this.connectCode = newConnectCode;
   }
 });
 
