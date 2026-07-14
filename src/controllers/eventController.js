@@ -53,7 +53,7 @@ exports.getPublicEventBySlug = async (req, res) => {
     // Fetch associated data
     const tickets = await Ticket.find({ eventId: event._id, status: 'Active' });
     const speakers = await Speaker.find({ eventId: event._id });
-    const schedule = await Schedule.find({ event: event._id }).sort({ startTime: 1 });
+    const schedule = await Schedule.find({ eventId: event._id }).sort({ startTime: 1 });
 
     // Construct response with shareable URL (fallback to ID if slug is missing)
     const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
@@ -413,7 +413,7 @@ exports.getEventById = async (req, res) => {
     }
     const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
     const publicUrl = baseUrl;
-    const schedule = await Schedule.find({ event: event._id }).sort({ startTime: 1 });
+    const schedule = await Schedule.find({ eventId: event._id }).sort({ startTime: 1 });
     
     res.json({
       ...event._doc,
