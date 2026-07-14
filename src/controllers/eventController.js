@@ -12,14 +12,15 @@ const { isEventExpired } = require('../utils/eventStatus');
 /**
  * @desc    Helper to ensure a General Lobby exists for an event
  */
-const ensureGeneralLobby = async (eventId) => {
+const ensureGeneralLobby = async (eventId, userId) => {
   try {
     const existingRoom = await Room.findOne({ event: eventId, name: 'General Lobby' });
     if (!existingRoom) {
       const room = new Room({
         event: eventId,
         name: 'General Lobby',
-        type: 'public'
+        type: 'public',
+        createdBy: userId
       });
       await room.save();
       console.log(`[Chat] General Lobby created for event ${eventId}`);
@@ -276,7 +277,7 @@ exports.publishEvent = async (req, res) => {
     await event.save();
     
     // Create General Lobby room for the event
-    await ensureGeneralLobby(event._id);
+    await ensureGeneralLobby(event._id, req.user.id);
     
     // Sync to Organizer's Google Calendar
     try {
@@ -322,7 +323,7 @@ exports.draftToLive = async (req, res) => {
     await event.save();
 
     // Create General Lobby room for the event
-    await ensureGeneralLobby(event._id);
+    await ensureGeneralLobby(event._id, req.user.id);
 
     // Sync to Organizer's Google Calendar
     try {
