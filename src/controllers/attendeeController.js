@@ -247,10 +247,18 @@ exports.registerAttendee = async (req, res) => {
     const result = await coreRegister({ eventId, name, email, ticketId, paymentReference, amount: expectedAmount });
     
     if (result.alreadyRegistered) {
+      // Check if webhook already processed this exact payment
+      if (expectedAmount > 0 && paymentReference && paymentReference === result.attendee.paymentReference) {
+        const payload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
+        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
+        return res.status(200).json({ token, attendee: result.attendee });
+      }
       return res.status(400).json({ message: 'You have already registered for this event' });
     }
 
-    res.status(201).json(result.attendee);
+    const payload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.status(201).json({ token, attendee: result.attendee });
   } catch (error) {
     console.error('[Register Attendee] Error:', error);
     res.status(error.message === 'Event not found' ? 404 : 400).json({ message: error.message || 'Server Error' });
@@ -292,10 +300,18 @@ exports.googleRegisterAttendee = async (req, res) => {
     const result = await coreRegister({ eventId, name, email, ticketId, paymentReference, amount: expectedAmount, googleId });
     
     if (result.alreadyRegistered) {
+      // Check if webhook already processed this exact payment
+      if (expectedAmount > 0 && paymentReference && paymentReference === result.attendee.paymentReference) {
+        const tokenPayload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
+        const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '30d' });
+        return res.status(200).json({ token, attendee: result.attendee });
+      }
       return res.status(400).json({ message: 'You have already registered for this event' });
     }
 
-    res.status(201).json(result.attendee);
+    const tokenPayload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.status(201).json({ token, attendee: result.attendee });
   } catch (error) {
     console.error('[Google Register Attendee] Error:', error);
     res.status(error.message === 'Event not found' ? 404 : 400).json({ message: error.message || 'Invalid Google token' });
