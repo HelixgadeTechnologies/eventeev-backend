@@ -9,17 +9,16 @@ const Event = require('../models/Event');
  */
 exports.getSpeakersByEvent = async (req, res) => {
   try {
-    // Check if user owns the event
-
     const event = await Event.findById(req.params.eventId);
-    if (!event || event.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'User not authorized to access this event\'s speakers' });
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
     }
 
     const speakers = await Speaker.find({ eventId: req.params.eventId });
     res.json(speakers);
 
   } catch (error) {
+    console.error('[Get Speakers] Error:', error);
     res.status(500).send('Server Error');
   }
 };
