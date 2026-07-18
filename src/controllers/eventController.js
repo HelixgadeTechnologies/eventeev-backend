@@ -46,6 +46,11 @@ exports.getPublicEventBySlug = async (req, res) => {
       event = await Event.findOne({ _id: req.params.slug, status: 'Published' });
     }
 
+    // Fallback: Try finding by connectCode
+    if (!event) {
+      event = await Event.findOne({ connectCode: req.params.slug.toUpperCase(), status: 'Published' });
+    }
+
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
