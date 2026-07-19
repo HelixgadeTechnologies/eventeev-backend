@@ -81,6 +81,7 @@ router.get('/event/:eventId', scheduleController.getEventSchedule);
  *       200:
  *         description: Schedule item removed
  */
+router.put('/reorder', auth, scheduleController.reorderScheduleItems);
 router.put('/:id', auth, scheduleController.updateScheduleItem);
 router.delete('/:id', auth, scheduleController.deleteScheduleItem);
 
