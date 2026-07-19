@@ -41,7 +41,7 @@ exports.createScheduleItem = async (req, res) => {
  */
 exports.getEventSchedule = async (req, res) => {
   try {
-    const schedule = await Schedule.find({ eventId: req.params.eventId }).sort({ startTime: 1 });
+    const schedule = await Schedule.find({ event: req.params.eventId }).sort({ startTime: 1 });
     res.json(schedule);
   } catch (error) {
     console.error(error.message);

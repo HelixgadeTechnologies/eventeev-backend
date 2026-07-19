@@ -42,7 +42,7 @@ const mongoose = require('mongoose');
  *           format: date-time
  */
 const ScheduleSchema = new mongoose.Schema({
-  eventId: {
+  event: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
     required: true,
@@ -52,9 +52,11 @@ const ScheduleSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a schedule title'],
   },
+  type: {
+    type: String,
+  },
   date: {
     type: Date,
-    required: [true, 'Please add a schedule date'],
   },
   startTime: {
     type: String,
@@ -67,6 +69,10 @@ const ScheduleSchema = new mongoose.Schema({
   description: {
     type: String,
   },
+  speakers: [{
+    name: String,
+    role: String,
+  }],
   speakerIds: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Speaker',

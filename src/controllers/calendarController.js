@@ -49,6 +49,53 @@ exports.createCalendarEvent = async (req, res) => {
 };
 
 /**
+ * @desc    Create a new calendar event (Public)
+ * @route   POST /api/calendar/public
+ * @access  Public
+ */
+exports.createPublicCalendarEvent = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const {
+      title,
+      description,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      location,
+      website,
+      category,
+      type
+    } = req.body;
+
+    const calendarEvent = new CalendarEvent({
+      title,
+      description,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      location,
+      website,
+      category,
+      type,
+      owner: null // Public events have no owner
+    });
+
+    await calendarEvent.save();
+    res.status(201).json(calendarEvent);
+  } catch (error) {
+    console.error('[Create Public Calendar Event] Error:', error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
  * @desc    Get current user's calendar events
  * @route   GET /api/calendar/me
  * @access  Private

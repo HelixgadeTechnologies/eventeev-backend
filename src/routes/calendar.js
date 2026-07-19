@@ -48,6 +48,26 @@ router.post(
 
 /**
  * @openapi
+ * /api/calendar/public:
+ *   post:
+ *     tags: [Calendar]
+ *     summary: Submit a new calendar event without authentication (Public)
+ */
+router.post(
+  '/public',
+  [
+    check('title', 'Title is required').not().isEmpty(),
+    check('startDate', 'Start date is required').isISO8601(),
+    check('startTime', 'Start time is required').not().isEmpty(),
+    check('location', 'Location/Venue is required').not().isEmpty(),
+    check('category', 'Category is required').not().isEmpty(),
+    check('type', 'Type must be virtual, hybrid, or in person').isIn(['virtual', 'hybrid', 'in person'])
+  ],
+  calendarController.createPublicCalendarEvent
+);
+
+/**
+ * @openapi
  * /api/calendar/admin:
  *   get:
  *     tags: [Calendar]
