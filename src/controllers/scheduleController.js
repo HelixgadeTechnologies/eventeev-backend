@@ -41,7 +41,7 @@ exports.createScheduleItem = async (req, res) => {
  */
 exports.getEventSchedule = async (req, res) => {
   try {
-    const schedule = await Schedule.find({ event: req.params.eventId }).sort({ startTime: 1 });
+    const schedule = await Schedule.find({ event: req.params.eventId }).sort({ order: 1, startTime: 1 });
     res.json(schedule);
   } catch (error) {
     console.error(error.message);
@@ -104,6 +104,38 @@ exports.deleteScheduleItem = async (req, res) => {
     await Schedule.findByIdAndDelete(req.params.id);
     res.json({ message: 'Schedule item removed' });
 
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Server Error');
+  }
+};
+
+/**
+ * @desc    Reorder schedule items
+ * @route   PUT /api/schedule/reorder
+ * @access  Private
+ */
+exports.reorderScheduleItems = async (req, res) => {
+  const { eventId, orderedIds } = req.body;
+  try {
+    const eventObj = await Event.findById(eventId);
+    if (!eventObj || eventObj.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'User not authorized to update schedule for this event' });
+    }
+
+    // Bulk update the order
+    const updates = orderedIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: id, event: eventId },
+        update: { $set: { order: index } },
+      },
+    }));
+
+    if (updates.length > 0) {
+      await Schedule.bulkWrite(updates);
+    }
+
+    res.json({ message: 'Schedule reordered successfully' });
   } catch (error) {
     console.error(error.message);
     res.status(500).send('Server Error');

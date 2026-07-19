@@ -62,6 +62,10 @@ const ScheduleSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a start time'],
   },
+  order: {
+    type: Number,
+    default: 0,
+  },
   endTime: {
     type: String,
     required: [true, 'Please add an end time'],
