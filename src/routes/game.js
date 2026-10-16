@@ -227,7 +227,7 @@ router.post('/quiz/session/join', gameController.joinSession);
  * /api/game/quiz/session/{pin}/submit:
  *   patch:
  *     tags: [Games - Quiz]
- *     summary: Submit an answer for a quiz question
+ *     summary: Submit an answer for a quiz question (Kahoot-style speed & accuracy scoring)
  *     parameters:
  *       - in: path
  *         name: pin
@@ -240,13 +240,32 @@ router.post('/quiz/session/join', gameController.joinSession);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [questionIndex, answer]
+ *             required: [questionIndex]
  *             properties:
- *               questionIndex: { type: number }
- *               answer: { type: array, items: { type: number } }
+ *               userId: { type: string, description: "Registered User ID or Participant ID" }
+ *               nickname: { type: string, description: "Player nickname (if guest)" }
+ *               questionIndex: { type: number, description: "Zero-based question index" }
+ *               answer: { type: array, items: { type: number }, description: "Zero-based indices of chosen answers" }
+ *               answerIndex: { type: number, description: "Legacy single-choice index" }
+ *               timeTaken: { type: number, description: "Seconds taken to answer since question started" }
  *     responses:
  *       200:
- *         description: Answer submitted
+ *         description: Answer evaluated and Kahoot points awarded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isCorrect: { type: boolean }
+ *                 basePoints: { type: number, description: "Speed-scaled base points (500 - 1000)" }
+ *                 streakBonus: { type: number, description: "Bonus points for consecutive correct answers" }
+ *                 points: { type: number, description: "Total points awarded for this answer" }
+ *                 streak: { type: number, description: "Current consecutive correct answer streak" }
+ *                 currentScore: { type: number, description: "Player cumulative score in this session" }
+ *       400:
+ *         description: Question already answered or invalid question index
+ *       404:
+ *         description: Session or participant not found
  */
 router.patch('/quiz/session/:pin/submit', gameController.submitAnswer);
 

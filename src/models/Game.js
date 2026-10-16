@@ -196,7 +196,7 @@ const QuizSchema = new mongoose.Schema({
       options: [String],
       correctAnswer: [Number], // Indices
       timeLimit: { type: Number, default: 20 },
-      points: { type: Number, default: 5 },
+      points: { type: Number, default: 1000 },
       isMultiSelect: { type: Boolean, default: false },
     },
   ],
@@ -238,6 +238,18 @@ const QuizSessionSchema = new mongoose.Schema({
       score: { type: Number, default: 0 },
       streak: { type: Number, default: 0 },
       lastAnswerCorrect: { type: Boolean, default: false },
+      answers: [
+        {
+          questionIndex: Number,
+          answer: [Number],
+          timeTaken: Number,
+          isCorrect: Boolean,
+          basePoints: Number,
+          streakBonus: Number,
+          totalPoints: Number,
+          answeredAt: { type: Date, default: Date.now },
+        },
+      ],
     },
   ],
   createdAt: {

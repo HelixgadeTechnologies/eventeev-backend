@@ -101,34 +101,178 @@ exports.joinSession = async (req, res) => {
 };
 
 /**
- * @desc    Submit answer
+ * Calculate Kahoot-style points based on accuracy, response time, and streak.
+ * - Incorrect answer or expired time: 0 points, streak resets.
+ * - Correct answer within time limit: Awards between 50% and 100% of maxPoints using linear decay:
+ *     BasePoints = round((1 - (timeTaken / (2 * timeLimit))) * maxPoints)
+ * - Streak bonus:
+ *     Streak 2: +100
+ *     Streak 3: +200
+ *     Streak 4: +300
+ *     Streak >= 5: +500
+ */
+const calculateKahootScore = (isCorrect, timeTaken, timeLimit, maxPoints = 1000, currentStreak = 0) => {
+  if (!isCorrect) {
+    return { basePoints: 0, streakBonus: 0, totalPoints: 0, newStreak: 0 };
+  }
+
+  const limit = timeLimit > 0 ? timeLimit : 20;
+  const t = typeof timeTaken === 'number' ? timeTaken : parseFloat(timeTaken) || 0;
+
+  // If time exceeds question limit (with 0.5s network latency grace window)
+  if (t > limit + 0.5) {
+    return { basePoints: 0, streakBonus: 0, totalPoints: 0, newStreak: 0 };
+  }
+
+  // Clamped time between 0 and limit
+  const clampedTime = Math.max(0, Math.min(t, limit));
+
+  // Kahoot speed formula: (1 - ((response_time / question_timer) / 2)) * max_points
+  const speedRatio = clampedTime / (2 * limit);
+  const basePoints = Math.round((1 - speedRatio) * maxPoints);
+
+  // Streak bonus calculation
+  const newStreak = (currentStreak || 0) + 1;
+  let streakBonus = 0;
+  if (newStreak === 2) streakBonus = 100;
+  else if (newStreak === 3) streakBonus = 200;
+  else if (newStreak === 4) streakBonus = 300;
+  else if (newStreak >= 5) streakBonus = 500;
+
+  return {
+    basePoints,
+    streakBonus,
+    totalPoints: basePoints + streakBonus,
+    newStreak,
+  };
+};
+
+/**
+ * @desc    Submit answer (Kahoot-style speed & accuracy scoring)
  * @route   PATCH /api/game/quiz/session/:pin/submit
- * @access  Private
+ * @access  Public
  */
 exports.submitAnswer = async (req, res) => {
   const { pin } = req.params;
-  const { userId, questionIndex, answerIndex, timeTaken } = req.body;
+  const { userId, nickname, questionIndex, answerIndex, answer, timeTaken } = req.body;
+
   try {
     const session = await QuizSession.findOne({ pin }).populate('quizId');
     if (!session) return res.status(404).json({ message: 'Session not found' });
 
     const quiz = session.quizId;
-    const question = quiz.questions[questionIndex];
-    const isCorrect = question.correctAnswer.includes(answerIndex);
-
-    // Scoring logic (simplified)
-    const points = isCorrect ? Math.round(question.points * (1 - timeTaken / question.timeLimit)) : 0;
-
-    const participant = session.participants.find(p => p.userId.toString() === userId);
-    if (participant) {
-      participant.score += points;
-      participant.streak = isCorrect ? participant.streak + 1 : 0;
-      participant.lastAnswerCorrect = isCorrect;
+    if (!quiz || !quiz.questions || !quiz.questions[questionIndex]) {
+      return res.status(400).json({ message: 'Invalid question index' });
     }
 
+    const question = quiz.questions[questionIndex];
+
+    // Find participant by userId, subdocument _id, or nickname
+    const participant = session.participants.find(p => {
+      if (userId && p.userId && p.userId.toString() === userId.toString()) return true;
+      if (userId && p._id && p._id.toString() === userId.toString()) return true;
+      if (nickname && p.nickname && p.nickname.toLowerCase() === nickname.toLowerCase()) return true;
+      return false;
+    });
+
+    if (!participant) {
+      return res.status(404).json({ message: 'Participant not found in this session' });
+    }
+
+    // Initialize answers array if missing
+    if (!participant.answers) {
+      participant.answers = [];
+    }
+
+    // Guard against multiple submissions for the same question
+    const alreadyAnswered = participant.answers.some(a => a.questionIndex === Number(questionIndex));
+    if (alreadyAnswered) {
+      return res.status(400).json({ message: 'You have already submitted an answer for this question' });
+    }
+
+    // Normalize submitted answers to an array of numbers
+    let submittedAnswers = [];
+    if (Array.isArray(answer)) {
+      submittedAnswers = answer.map(Number);
+    } else if (answer !== undefined && answer !== null) {
+      submittedAnswers = [Number(answer)];
+    } else if (answerIndex !== undefined && answerIndex !== null) {
+      submittedAnswers = [Number(answerIndex)];
+    }
+
+    // Check correctness
+    const correctAnswers = (question.correctAnswer || []).map(Number);
+    let isCorrect = false;
+
+    if (question.isMultiSelect) {
+      // Must match all correct indices with no extraneous choices
+      isCorrect =
+        submittedAnswers.length === correctAnswers.length &&
+        submittedAnswers.every(ans => correctAnswers.includes(ans));
+    } else {
+      // Single choice
+      isCorrect =
+        submittedAnswers.length === 1 &&
+        correctAnswers.includes(submittedAnswers[0]);
+    }
+
+    // Calculate Kahoot points
+    const maxPoints = question.points || 1000;
+    const { basePoints, streakBonus, totalPoints, newStreak } = calculateKahootScore(
+      isCorrect,
+      timeTaken,
+      question.timeLimit || 20,
+      maxPoints,
+      participant.streak || 0
+    );
+
+    // Update participant stats
+    participant.score = (participant.score || 0) + totalPoints;
+    participant.streak = newStreak;
+    participant.lastAnswerCorrect = isCorrect;
+    participant.answers.push({
+      questionIndex: Number(questionIndex),
+      answer: submittedAnswers,
+      timeTaken: Number(timeTaken) || 0,
+      isCorrect,
+      basePoints,
+      streakBonus,
+      totalPoints,
+      answeredAt: new Date(),
+    });
+
     await session.save();
-    res.json({ isCorrect, points, currentScore: participant?.score });
+
+    // Broadcast updated leaderboard to Socket.IO room if available
+    try {
+      const { getIO } = require('../utils/socket');
+      const io = getIO();
+      io.to(`quiz_${pin}`).emit('quiz_leaderboard_updated', {
+        pin,
+        leaderboard: session.participants
+          .map(p => ({
+            userId: p.userId,
+            nickname: p.nickname,
+            score: p.score,
+            streak: p.streak,
+            lastAnswerCorrect: p.lastAnswerCorrect,
+          }))
+          .sort((a, b) => (b.score || 0) - (a.score || 0)),
+      });
+    } catch (socketErr) {
+      // Socket instance might not be initialized in non-server contexts (e.g. unit tests)
+    }
+
+    res.json({
+      isCorrect,
+      points: totalPoints,
+      basePoints,
+      streakBonus,
+      streak: participant.streak,
+      currentScore: participant.score,
+    });
   } catch (error) {
+    console.error('Error submitting quiz answer:', error);
     res.status(500).send('Server Error');
   }
 };
@@ -143,7 +287,9 @@ exports.getLeaderboard = async (req, res) => {
     const session = await QuizSession.findOne({ pin: req.params.pin });
     if (!session) return res.status(404).json({ message: 'Session not found' });
 
-    const sortedParticipants = session.participants.sort((a, b) => b.score - a.score);
+    const sortedParticipants = session.participants.sort(
+      (a, b) => (b.score || 0) - (a.score || 0)
+    );
     res.json(sortedParticipants);
   } catch (error) {
     res.status(500).send('Server Error');
