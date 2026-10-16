@@ -446,12 +446,30 @@ exports.getAllQuizzes = async (req, res) => {
  */
 exports.adminCreateQuiz = async (req, res) => {
   try {
-    const quiz = new Quiz(req.body);
+    // Support bulk JSON upload (array of quizzes)
+    if (Array.isArray(req.body)) {
+      const sanitized = req.body.map(item => ({
+        ...item,
+        isTemplate: item.isTemplate !== undefined ? item.isTemplate : true,
+        isFeatured: item.isFeatured !== undefined ? item.isFeatured : true,
+        eventId: item.eventId || null,
+      }));
+      const quizzes = await Quiz.insertMany(sanitized);
+      return res.status(201).json(quizzes);
+    }
+
+    const payload = {
+      ...req.body,
+      isTemplate: req.body.isTemplate !== undefined ? req.body.isTemplate : true,
+      isFeatured: req.body.isFeatured !== undefined ? req.body.isFeatured : true,
+      eventId: req.body.eventId || null,
+    };
+    const quiz = new Quiz(payload);
     await quiz.save();
     res.status(201).json(quiz);
   } catch (error) {
     console.error(error.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: error.message || 'Server Error' });
   }
 };
 

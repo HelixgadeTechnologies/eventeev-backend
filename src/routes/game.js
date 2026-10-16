@@ -158,6 +158,45 @@ router.post('/quiz/create', auth, gameController.createQuiz);
 
 /**
  * @openapi
+ * /api/game/quiz/templates:
+ *   get:
+ *     tags: [Games - Quiz]
+ *     summary: Get all template and featured quizzes
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+router.get('/quiz/templates', gameController.getTemplateQuizzes);
+
+/**
+ * @openapi
+ * /api/game/quiz/{id}/clone:
+ *   post:
+ *     tags: [Games - Quiz]
+ *     summary: Clone a template quiz to an event
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [eventId]
+ *             properties:
+ *               eventId: { type: string }
+ *     responses:
+ *       201:
+ *         description: Cloned successfully
+ */
+router.post('/quiz/:id/clone', auth, gameController.cloneQuiz);
+
+/**
+ * @openapi
  * /api/game/quiz/{id}:
  *   get:
  *     tags: [Games - Quiz]

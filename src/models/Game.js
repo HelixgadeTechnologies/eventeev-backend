@@ -176,7 +176,8 @@ const QuizSchema = new mongoose.Schema({
   eventId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
-    required: true,
+    required: false,
+    default: null,
   },
   title: {
     type: String,
@@ -187,6 +188,41 @@ const QuizSchema = new mongoose.Schema({
   },
   category: {
     type: String,
+    default: 'Trivia',
+  },
+  thumbnail: {
+    type: String,
+    default: '/thumbnails/space_trivia.png',
+  },
+  author: {
+    type: String,
+    default: 'Eventeev Staff',
+  },
+  isVerified: {
+    type: Boolean,
+    default: true,
+  },
+  level: {
+    type: String,
+    default: 'Med',
+  },
+  avgTime: {
+    type: String,
+    default: '15m',
+  },
+  plays: {
+    type: Number,
+    default: 0,
+  },
+  isTemplate: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  isFeatured: {
+    type: Boolean,
+    default: false,
+    index: true,
   },
   questions: [
     {

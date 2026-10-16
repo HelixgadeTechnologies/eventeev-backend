@@ -29,6 +29,84 @@ exports.createQuiz = async (req, res) => {
 };
 
 /**
+ * @desc    Get all template/featured quizzes for event organizers
+ * @route   GET /api/game/quiz/templates
+ * @access  Public / Authenticated
+ */
+exports.getTemplateQuizzes = async (req, res) => {
+  try {
+    const { category, search, featured } = req.query;
+    const filter = {
+      $or: [
+        { isTemplate: true },
+        { eventId: null }
+      ]
+    };
+
+    if (category && category.toLowerCase() !== 'all') {
+      filter.category = new RegExp('^' + category + '$', 'i');
+    }
+
+    if (search) {
+      filter.title = new RegExp(search, 'i');
+    }
+
+    if (featured === 'true') {
+      filter.isFeatured = true;
+    }
+
+    const quizzes = await Quiz.find(filter).sort({ createdAt: -1 });
+    res.json(quizzes);
+  } catch (error) {
+    console.error('Error fetching template quizzes:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+/**
+ * @desc    Clone a template quiz into an event-specific quiz
+ * @route   POST /api/game/quiz/:id/clone
+ * @access  Private
+ */
+exports.cloneQuiz = async (req, res) => {
+  try {
+    const { eventId } = req.body;
+    if (!eventId) {
+      return res.status(400).json({ message: 'eventId is required to clone a quiz' });
+    }
+
+    const templateQuiz = await Quiz.findById(req.params.id);
+    if (!templateQuiz) {
+      return res.status(404).json({ message: 'Template quiz not found' });
+    }
+
+    // Verify event ownership
+    const event = await Event.findById(eventId);
+    if (!event || (event.owner && req.user && event.owner.toString() !== req.user.id)) {
+      return res.status(403).json({ message: 'User not authorized for this event' });
+    }
+
+    const clonedQuiz = new Quiz({
+      eventId,
+      title: req.body.title || templateQuiz.title,
+      description: req.body.description || templateQuiz.description,
+      category: templateQuiz.category,
+      thumbnail: templateQuiz.thumbnail,
+      author: (req.user && req.user.name) || event.organizer || 'Event Organizer',
+      questions: templateQuiz.questions,
+      isTemplate: false,
+      isFeatured: false,
+    });
+
+    await clonedQuiz.save();
+    res.status(201).json(clonedQuiz);
+  } catch (error) {
+    console.error('Error cloning quiz:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+/**
  * @desc    Get quiz by id
  * @route   GET /api/game/quiz/:id
  * @access  Public
@@ -38,10 +116,12 @@ exports.getQuiz = async (req, res) => {
     const quiz = await Quiz.findById(req.params.id);
     if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
 
-    // Check ownership
-    const event = await Event.findById(quiz.eventId);
-    if (!event || event.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'User not authorized to access this quiz' });
+    // Check ownership only if this is a private event-specific quiz
+    if (!quiz.isTemplate && quiz.eventId) {
+      const event = await Event.findById(quiz.eventId);
+      if (event && event.owner && req.user && event.owner.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'User not authorized to access this quiz' });
+      }
     }
 
     res.json(quiz);
@@ -61,10 +141,12 @@ exports.hostQuiz = async (req, res) => {
     const quiz = await Quiz.findById(req.params.id);
     if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
 
-    // Check ownership
-    const event = await Event.findById(quiz.eventId);
-    if (!event || event.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'User not authorized to host this quiz' });
+    // Check ownership only if this is a private event-specific quiz
+    if (!quiz.isTemplate && quiz.eventId) {
+      const event = await Event.findById(quiz.eventId);
+      if (event && event.owner && req.user && event.owner.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'User not authorized to host this quiz' });
+      }
     }
 
     const pin = Math.floor(100000 + Math.random() * 900000).toString();
