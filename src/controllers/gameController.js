@@ -28,6 +28,23 @@ exports.createQuiz = async (req, res) => {
       return res.status(403).json({ message: 'User not authorized to create quizzes for this event' });
     }
 
+    const quizTargetId = req.body.id || req.body._id;
+    if (quizTargetId && mongoose.Types.ObjectId.isValid(quizTargetId)) {
+      const existing = await Quiz.findById(quizTargetId);
+      if (existing) {
+        existing.title = req.body.title || existing.title;
+        existing.description = req.body.description !== undefined ? req.body.description : existing.description;
+        existing.category = req.body.category || existing.category;
+        existing.thumbnail = req.body.thumbnail || existing.thumbnail;
+        existing.questions = req.body.questions || existing.questions;
+        if (req.user && req.user.name) {
+          existing.author = req.user.name;
+        }
+        await existing.save();
+        return res.json(existing);
+      }
+    }
+
     const quiz = new Quiz({
       ...req.body,
       createdBy: req.user ? req.user.id : undefined,
