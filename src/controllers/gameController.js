@@ -179,27 +179,58 @@ exports.getQuiz = async (req, res) => {
 exports.hostQuiz = async (req, res) => {
   try {
     const quiz = await Quiz.findById(req.params.id);
-    if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
+    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
 
-    // Check ownership only if this is a private event-specific quiz
-    if (!quiz.isTemplate && quiz.eventId) {
-      const event = await Event.findById(quiz.eventId);
+    let event = null;
+    if (quiz.eventId) {
+      event = await Event.findById(quiz.eventId);
       if (event && event.owner && req.user && event.owner.toString() !== req.user.id) {
-        return res.status(403).json({ message: 'User not authorized to host this quiz' });
+        return res.status(403).json({ message: "User not authorized to host this quiz" });
       }
     }
 
-    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate unique 6-digit PIN code
+    let pin;
+    let attempts = 0;
+    while (attempts < 10) {
+      const candidate = Math.floor(100000 + Math.random() * 900000).toString();
+      const existing = await QuizSession.findOne({ pin: candidate, status: { $in: ["waiting", "active"] } });
+      if (!existing) {
+        pin = candidate;
+        break;
+      }
+      attempts++;
+    }
+    if (!pin) {
+      pin = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    const hostId = (req.user && (req.user.id || req.user._id)) || (event && event.owner) || quiz.createdBy;
+    if (!hostId) {
+      return res.status(401).json({ message: "Host identification required" });
+    }
 
     const session = new QuizSession({
       quizId: req.params.id,
-      hostId: req.user.id, // Assuming auth middleware provides req.user
+      hostId,
       pin,
+      status: "waiting",
+      participants: []
     });
+
     await session.save();
-    res.status(201).json(session);
+    res.status(201).json({
+      _id: session._id,
+      id: session._id,
+      quizId: session.quizId,
+      hostId: session.hostId,
+      pin: session.pin,
+      status: session.status,
+      participants: session.participants
+    });
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error("Error hosting quiz:", error);
+    res.status(500).json({ message: error.message || "Server Error" });
   }
 };
 
@@ -210,15 +241,41 @@ exports.hostQuiz = async (req, res) => {
  */
 exports.joinSession = async (req, res) => {
   const { pin, nickname, userId } = req.body;
+  if (!pin) {
+    return res.status(400).json({ message: "A 6-digit Game PIN is required" });
+  }
+  if (!nickname || !nickname.trim()) {
+    return res.status(400).json({ message: "Nickname is required to join" });
+  }
+
+  const cleanPin = pin.toString().replace(/\s+/g, "").trim();
+
   try {
-    const session = await QuizSession.findOne({ pin, status: 'waiting' });
-    if (!session) return res.status(404).json({ message: 'Session not found or already started' });
-    
-    session.participants.push({ userId, nickname });
-    await session.save();
+    const session = await QuizSession.findOne({ pin: cleanPin, status: "waiting" }).populate("quizId");
+    if (!session) {
+      return res.status(404).json({ message: "Game session not found or already in progress" });
+    }
+
+    const trimmedNick = nickname.trim();
+    const alreadyJoined = session.participants.some(
+      (p) => (p.nickname && p.nickname.toLowerCase() === trimmedNick.toLowerCase()) ||
+             (userId && p.userId && p.userId.toString() === userId.toString())
+    );
+
+    if (!alreadyJoined) {
+      session.participants.push({
+        userId: userId || undefined,
+        nickname: trimmedNick,
+        score: 0,
+        streak: 0,
+      });
+      await session.save();
+    }
+
     res.json(session);
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error("Error joining session:", error);
+    res.status(500).json({ message: error.message || "Server Error" });
   }
 };
 
