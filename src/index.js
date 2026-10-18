@@ -33,10 +33,52 @@ const io = initSocket(server);
 
 // socket.js handles the connection and notification rooms.
 // We'll keep the message logic here for now, but use the io instance from initSocket.
+const jwt = require('jsonwebtoken');
+const Room = require('./models/Room');
+const Message = require('./models/Message');
+const Event = require('./models/Event');
+const Attendee = require('./models/Attendee');
+
 io.on('connection', (socket) => {
   console.log('User connected to base socket:', socket.id);
 
-  socket.on('join_room', (roomId) => {
+  // Authenticate socket user or attendee from auth token
+  const token = socket.handshake.auth?.token;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.user) socket.user = decoded.user;
+      else if (decoded.attendee) socket.attendee = decoded.attendee;
+    } catch (err) {
+      // Token expired or invalid
+    }
+  }
+
+  socket.on('join_room', async (roomId) => {
+    // If roomId is a valid Mongo ObjectId, verify room permissions
+    if (mongoose.Types.ObjectId.isValid(roomId)) {
+      try {
+        const roomDoc = await Room.findById(roomId);
+        if (roomDoc && (roomDoc.isGroup === false || roomDoc.type === 'private')) {
+          const socketId = socket.user?.id || socket.attendee?.id;
+          const isParticipant = socketId && roomDoc.participantIds && roomDoc.participantIds.includes(String(socketId));
+          let isOwner = false;
+          if (socket.user) {
+            const eventObj = await Event.findById(roomDoc.event);
+            isOwner = Boolean(eventObj && eventObj.owner.toString() === socket.user.id);
+          }
+
+          if (!isParticipant && !isOwner) {
+            console.warn(`[Socket] Unauthorized join attempt to room ${roomId} by socket ${socket.id} (user: ${socketId})`);
+            socket.emit('error', { message: 'Unauthorized to join this private room' });
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('[Socket] Error verifying room join:', err);
+      }
+    }
+
     socket.join(roomId);
     console.log(`Socket ${socket.id} joined room ${roomId}`);
     
@@ -67,15 +109,58 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (data) => {
     const { room, sender, content, type } = data;
     try {
+      let isDirect = false;
+      let roomDoc = null;
+
+      if (mongoose.Types.ObjectId.isValid(room)) {
+        roomDoc = await Room.findById(room);
+        if (roomDoc) {
+          isDirect = (roomDoc.isGroup === false || roomDoc.type === 'private');
+        }
+      }
+
+      // Check permission if it's a private direct message room
+      if (isDirect && roomDoc) {
+        const socketId = socket.user?.id || socket.attendee?.id || sender;
+        const isParticipant = socketId && roomDoc.participantIds && roomDoc.participantIds.includes(String(socketId));
+        let isOwner = false;
+        if (socket.user) {
+          const eventObj = await Event.findById(roomDoc.event);
+          isOwner = Boolean(eventObj && eventObj.owner.toString() === socket.user.id);
+        }
+
+        if (!isParticipant && !isOwner) {
+          console.warn(`[Socket] Unauthorized send_message to private room ${room} by socket ${socket.id}`);
+          return;
+        }
+      }
+
+      const senderModel = socket.user ? 'User' : (socket.attendee ? 'Attendee' : 'User');
       const newMessage = new Message({
         room,
         sender,
+        senderModel,
         content,
-        type
+        type: type || 'user_message'
       });
       await newMessage.save();
       
-      const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name avatar');
+      let populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name avatar');
+      if (!populatedMessage?.sender || typeof populatedMessage.sender !== 'object') {
+        const att = await Attendee.findById(sender);
+        if (att) {
+          populatedMessage = {
+            ...populatedMessage.toObject(),
+            sender: {
+              _id: att._id,
+              id: att._id,
+              name: att.name,
+              avatar: null
+            }
+          };
+        }
+      }
+
       io.to(room).emit('receive_message', populatedMessage);
     } catch (error) {
       console.error('Error sending message via socket:', error);
@@ -83,12 +168,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnecting', () => {
-    // Before actual disconnect, we can see which rooms the socket was in
     for (const roomId of socket.rooms) {
-      if (roomId !== socket.id) { // ignore the auto-generated room for this socket
+      if (roomId !== socket.id) {
         const room = io.sockets.adapter.rooms.get(roomId);
         if (room) {
-          const count = room.size - 1; // current size including this socket which is about to leave
+          const count = room.size - 1;
           io.to(roomId).emit('room_status', {
             activated: count >= 2,
             count: count,

@@ -23,7 +23,7 @@ const mongoose = require('mongoose');
  *           type: string
  *         type:
  *           type: string
- *           enum: [user_message, system_message]
+ *           enum: [user_message, system_message, image, file]
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -37,9 +37,20 @@ const MessageSchema = new mongoose.Schema({
   },
   sender: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    refPath: 'senderModel',
     required: true,
     index: true,
+  },
+  senderModel: {
+    type: String,
+    enum: ['User', 'Attendee'],
+    default: 'User',
+  },
+  senderName: {
+    type: String,
+  },
+  senderAvatar: {
+    type: String,
   },
   content: {
     type: String,
@@ -47,7 +58,7 @@ const MessageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['user_message', 'system_message'],
+    enum: ['user_message', 'system_message', 'image', 'file'],
     default: 'user_message',
   },
   createdAt: {
