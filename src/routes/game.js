@@ -170,6 +170,24 @@ router.get('/quiz/templates', gameController.getTemplateQuizzes);
 
 /**
  * @openapi
+ * /api/game/quiz/event/{eventId}:
+ *   get:
+ *     tags: [Games - Quiz]
+ *     summary: Get all quizzes for an event
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+router.get('/quiz/event/:eventId', gameController.getQuizzesByEvent);
+
+/**
+ * @openapi
  * /api/game/quiz/{id}/clone:
  *   post:
  *     tags: [Games - Quiz]

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { GameSetting, GameWinner, Quiz, QuizSession } = require('../models/Game');
 const User = require('../models/User');
 const Event = require('../models/Event');
@@ -13,18 +14,31 @@ const Event = require('../models/Event');
 exports.createQuiz = async (req, res) => {
   try {
     const { eventId } = req.body;
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ message: 'A valid eventId is required' });
+    }
+
     // Check ownership
     const event = await Event.findById(eventId);
-    if (!event || event.owner.toString() !== req.user.id) {
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (event.owner && req.user && event.owner.toString() !== req.user.id) {
       return res.status(403).json({ message: 'User not authorized to create quizzes for this event' });
     }
 
-    const quiz = new Quiz(req.body);
+    const quiz = new Quiz({
+      ...req.body,
+      createdBy: req.user ? req.user.id : undefined,
+      author: (req.user && req.user.name) || (event && event.organizer) || req.body.author || "Organizer"
+    });
 
     await quiz.save();
     res.status(201).json(quiz);
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('Error creating quiz:', error);
+    res.status(500).json({ message: error.message || 'Server Error' });
   }
 };
 
@@ -33,6 +47,32 @@ exports.createQuiz = async (req, res) => {
  * @route   GET /api/game/quiz/templates
  * @access  Public / Authenticated
  */
+/**
+ * @desc    Get all quizzes for an event
+ * @route   GET /api/game/quiz/event/:eventId
+ * @access  Public / Authenticated
+ */
+exports.getQuizzesByEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ message: "A valid eventId is required" });
+    }
+
+    const eventObjectId = new mongoose.Types.ObjectId(eventId);
+    const quizzes = await Quiz.find({
+      $or: [
+        { eventId: eventId },
+        { eventId: eventObjectId }
+      ]
+    }).sort({ createdAt: -1 });
+    res.json(quizzes);
+  } catch (error) {
+    console.error("Error fetching event quizzes:", error);
+    res.status(500).json({ message: error.message || "Server Error" });
+  }
+};
+
 exports.getTemplateQuizzes = async (req, res) => {
   try {
     const { category, search, featured } = req.query;
