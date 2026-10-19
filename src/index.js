@@ -26,6 +26,12 @@ if (missingEnvVars.length > 0) {
   console.log('[SUCCESS] All required environment variables are present.');
 }
 
+if (!process.env.PAYSTACK_SECRET_KEY) {
+  console.warn('[WARNING] PAYSTACK_SECRET_KEY is missing from environment variables. Paystack payment processing will fail!');
+} else {
+  console.log('[SUCCESS] PAYSTACK_SECRET_KEY is configured.');
+}
+
 const { initSocket } = require('./utils/socket');
 const server = http.createServer(app);
 const io = initSocket(server);

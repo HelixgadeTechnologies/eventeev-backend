@@ -92,6 +92,18 @@ exports.initializePayment = async (req, res) => {
     }
 
     // 3. Initialize Paystack Transaction
+    if (!process.env.PAYSTACK_SECRET_KEY) {
+      console.error('[Initialize Payment] CRITICAL: PAYSTACK_SECRET_KEY is missing from environment variables.');
+      return res.status(500).json({ message: 'Payment gateway configuration error on server: PAYSTACK_SECRET_KEY is missing' });
+    }
+
+    if (amount === 0 || amount <= 0) {
+      return res.status(400).json({ 
+        message: 'Free tickets do not require payment. Please register directly via /api/attendee/register.',
+        isFree: true 
+      });
+    }
+
     // Paystack expects amount in kobo/cents
     const amountInKobo = Math.round(amount * 100);
 
@@ -122,6 +134,7 @@ exports.initializePayment = async (req, res) => {
     const result = await response.json();
 
     if (!result.status) {
+      console.error('[Initialize Payment] Paystack API error:', result);
       return res.status(400).json({ message: result.message || 'Failed to initialize payment' });
     }
 
