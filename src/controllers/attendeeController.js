@@ -138,6 +138,8 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
 
   // 5. Create or Update Attendee
   let attendee = existingRegistration;
+  let orderId = attendee?.orderId;
+  let qrCodeUrl = attendee?.qrCode;
   
   if (attendee && attendee.status === 'pending') {
     attendee.ticketId = ticketId;
@@ -145,12 +147,23 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
     attendee.amount = expectedAmount;
     attendee.status = 'verified';
     attendee.googleId = googleId;
+
+    if (!attendee.orderId) {
+      attendee.orderId = googleId 
+        ? `REG-G-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`
+        : `REG-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
+    }
+    if (!attendee.qrCode) {
+      attendee.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendee._id}`;
+    }
+    orderId = attendee.orderId;
+    qrCodeUrl = attendee.qrCode;
   } else {
     const attendeeId = new mongoose.Types.ObjectId();
-    const orderId = googleId 
+    orderId = googleId 
       ? `REG-G-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`
       : `REG-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
+    qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${attendeeId}`;
     
     attendee = new Attendee({
       _id: attendeeId,
