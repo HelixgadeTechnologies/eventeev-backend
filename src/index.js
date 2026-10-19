@@ -37,14 +37,18 @@ const jwt = require('jsonwebtoken');
 const Room = require('./models/Room');
 const Message = require('./models/Message');
 const Event = require('./models/Event');
+const User = require('./models/User');
 const Attendee = require('./models/Attendee');
 
 io.on('connection', (socket) => {
   console.log('User connected to base socket:', socket.id);
 
-  // Authenticate socket user or attendee from auth token
-  const token = socket.handshake.auth?.token;
+  // Authenticate socket user or attendee from auth token or headers
+  let token = socket.handshake.auth?.token || socket.handshake.headers?.['x-auth-token'] || socket.handshake.headers?.authorization;
   if (token) {
+    if (typeof token === 'string' && token.startsWith('Bearer ')) {
+      token = token.substring(7).trim();
+    }
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (decoded.user) socket.user = decoded.user;
@@ -62,14 +66,9 @@ io.on('connection', (socket) => {
         if (roomDoc && (roomDoc.isGroup === false || roomDoc.type === 'private')) {
           const socketId = socket.user?.id || socket.attendee?.id;
           const isParticipant = socketId && roomDoc.participantIds && roomDoc.participantIds.includes(String(socketId));
-          let isOwner = false;
-          if (socket.user) {
-            const eventObj = await Event.findById(roomDoc.event);
-            isOwner = Boolean(eventObj && eventObj.owner.toString() === socket.user.id);
-          }
 
-          if (!isParticipant && !isOwner) {
-            console.warn(`[Socket] Unauthorized join attempt to room ${roomId} by socket ${socket.id} (user: ${socketId})`);
+          if (!isParticipant) {
+            console.warn(`[Socket] Unauthorized join attempt to private room ${roomId} by socket ${socket.id} (user: ${socketId})`);
             socket.emit('error', { message: 'Unauthorized to join this private room' });
             return;
           }
@@ -123,42 +122,67 @@ io.on('connection', (socket) => {
       if (isDirect && roomDoc) {
         const socketId = socket.user?.id || socket.attendee?.id || sender;
         const isParticipant = socketId && roomDoc.participantIds && roomDoc.participantIds.includes(String(socketId));
+
+        if (!isParticipant) {
+          console.warn(`[Socket] Unauthorized send_message to private room ${room} by socket ${socket.id}`);
+          socket.emit('error', { message: 'Unauthorized to send message to this private room' });
+          return;
+        }
+      }
+
+      // Check announcement room permission
+      if (roomDoc && roomDoc.type === 'announcement') {
         let isOwner = false;
         if (socket.user) {
           const eventObj = await Event.findById(roomDoc.event);
           isOwner = Boolean(eventObj && eventObj.owner.toString() === socket.user.id);
         }
-
-        if (!isParticipant && !isOwner) {
-          console.warn(`[Socket] Unauthorized send_message to private room ${room} by socket ${socket.id}`);
+        if (!isOwner) {
+          socket.emit('error', { message: 'Only event organizers can post in announcement channels' });
           return;
         }
       }
 
       const senderModel = socket.user ? 'User' : (socket.attendee ? 'Attendee' : 'User');
+
+      // Resolve display name and avatar
+      let finalSenderName = data.senderName;
+      let finalSenderAvatar = data.senderAvatar;
+      if (!finalSenderName) {
+        if (socket.user) {
+          const u = await User.findById(sender).select('firstName lastName orgName avatar');
+          if (u) {
+            finalSenderName = u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Organizer';
+            finalSenderAvatar = u.avatar || null;
+          }
+        } else if (socket.attendee) {
+          const a = await Attendee.findById(sender).select('name');
+          if (a) finalSenderName = a.name;
+        }
+      }
+
       const newMessage = new Message({
         room,
         sender,
         senderModel,
+        senderName: finalSenderName,
+        senderAvatar: finalSenderAvatar,
         content,
         type: type || 'user_message'
       });
       await newMessage.save();
       
-      let populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name avatar');
+      let populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name firstName lastName avatar');
       if (!populatedMessage?.sender || typeof populatedMessage.sender !== 'object') {
-        const att = await Attendee.findById(sender);
-        if (att) {
-          populatedMessage = {
-            ...populatedMessage.toObject(),
-            sender: {
-              _id: att._id,
-              id: att._id,
-              name: att.name,
-              avatar: null
-            }
-          };
-        }
+        populatedMessage = {
+          ...populatedMessage.toObject(),
+          sender: {
+            _id: sender,
+            id: sender,
+            name: finalSenderName || 'User',
+            avatar: finalSenderAvatar || null
+          }
+        };
       }
 
       io.to(room).emit('receive_message', populatedMessage);

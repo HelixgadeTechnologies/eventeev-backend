@@ -1,7 +1,113 @@
 const Room = require('../models/Room');
 const Message = require('../models/Message');
 const Event = require('../models/Event');
+const User = require('../models/User');
+const Attendee = require('../models/Attendee');
 const mongoose = require('mongoose');
+const { getIO } = require('../utils/socket');
+
+/**
+ * Helper to resolve participant profile info (User or Attendee)
+ */
+async function resolveParticipant(id) {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+
+  // Check User collection first (Organizer / Admin)
+  const user = await User.findById(id).select('firstName lastName orgName avatar');
+  if (user) {
+    const fullName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.orgName || 'Organizer';
+    return {
+      id: String(user._id),
+      modelType: 'User',
+      name: fullName,
+      avatar: user.avatar || null,
+      role: 'admin',
+    };
+  }
+
+  // Check Attendee collection
+  const attendee = await Attendee.findById(id).select('name');
+  if (attendee) {
+    return {
+      id: String(attendee._id),
+      modelType: 'Attendee',
+      name: attendee.name,
+      avatar: null,
+      role: 'attendee',
+    };
+  }
+
+  return null;
+}
+
+/**
+ * @desc    Get participant directory for an event (Organizer + Confirmed Attendees)
+ * @route   GET /api/chat/participants/:eventId
+ * @access  Private (multiAuth: Organizer or registered Attendee)
+ */
+exports.getParticipants = async (req, res) => {
+  const { eventId } = req.params;
+
+  if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+    return res.status(400).json({ message: 'Valid event ID is required' });
+  }
+
+  try {
+    const event = await Event.findById(eventId).populate('owner', 'firstName lastName orgName avatar email');
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    const requesterId = req.user ? req.user.id : req.attendee?.id;
+    const isOwner = Boolean(req.user && event.owner && event.owner._id.toString() === req.user.id);
+
+    // If requester is not the event owner, verify they are a registered attendee of this event
+    if (!isOwner) {
+      if (!req.attendee || !req.attendee.id) {
+        return res.status(403).json({ message: 'Access denied: Must be registered attendee or organizer' });
+      }
+      const isReg = await Attendee.findOne({ _id: req.attendee.id, eventId });
+      if (!isReg) {
+        return res.status(403).json({ message: 'Access denied: You are not registered for this event' });
+      }
+    }
+
+    // 1. Organizer entry
+    const organizer = event.owner ? {
+      id: String(event.owner._id),
+      name: event.owner.name || `${event.owner.firstName || ''} ${event.owner.lastName || ''}`.trim() || event.owner.orgName || 'Organizer',
+      avatar: event.owner.avatar || null,
+      role: 'organizer',
+      modelType: 'User',
+      isCurrentUser: String(event.owner._id) === String(requesterId),
+    } : null;
+
+    // 2. Verified attendees (exclude cancelled)
+    const attendeesList = await Attendee.find({
+      eventId,
+      status: { $ne: 'cancelled' }
+    }).select('name status createdAt');
+
+    const attendees = attendeesList.map(att => ({
+      id: String(att._id),
+      name: att.name,
+      avatar: null,
+      role: 'attendee',
+      modelType: 'Attendee',
+      status: att.status,
+      isCurrentUser: String(att._id) === String(requesterId),
+    }));
+
+    res.json({
+      organizer,
+      attendees,
+      totalCount: (organizer ? 1 : 0) + attendees.length
+    });
+  } catch (error) {
+    console.error('getParticipants error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
 
 /**
  * @desc    Create a new chat room or get existing 1-on-1 direct room
@@ -54,13 +160,23 @@ exports.createRoom = async (req, res) => {
       }
     }
 
+    // Auto-resolve participant profiles if not passed or empty
+    let resolvedParticipants = Array.isArray(participants) && participants.length > 0 ? participants : [];
+    if (isDirect && resolvedParticipants.length < pIds.length) {
+      resolvedParticipants = [];
+      for (const id of pIds) {
+        const p = await resolveParticipant(id);
+        if (p) resolvedParticipants.push(p);
+      }
+    }
+
     const room = new Room({
       event: targetEventId,
       name: name || (isDirect ? 'Direct Message' : 'Public Lobby'),
       type: type || (isDirect ? 'private' : 'public'),
       isGroup: !isDirect,
       participantIds: pIds,
-      participants: Array.isArray(participants) ? participants : [],
+      participants: resolvedParticipants,
       leadParticipant: (leadParticipant && typeof leadParticipant === 'string' && mongoose.Types.ObjectId.isValid(leadParticipant)) ? leadParticipant : undefined,
       createdBy: req.user ? req.user.id : undefined,
     });
@@ -88,16 +204,19 @@ exports.getRooms = async (req, res) => {
   try {
     const requesterId = req.user ? req.user.id : req.attendee?.id;
     const eventObj = await Event.findById(eventId);
-    const isOwner = Boolean(req.user && eventObj && eventObj.owner.toString() === req.user.id);
+    if (!eventObj) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const isOwner = Boolean(req.user && eventObj.owner.toString() === req.user.id);
 
     let query;
-    if (isOwner) {
-      // Event owner/admin sees all group channels + all direct message rooms in the event
+    if (isOwner && req.query.allRooms === 'true') {
+      // Explicit moderation view requested by event owner
       query = { event: eventId };
     } else if (requesterId) {
-      // Attendee sees:
+      // Both Organizer and Attendees see:
       // 1. All group rooms (isGroup = true OR legacy rooms with type != 'private')
-      // 2. Direct message rooms WHERE participantIds includes their ID
+      // 2. Direct message rooms WHERE they are an explicit participant
       query = {
         event: eventId,
         $or: [
@@ -118,10 +237,25 @@ exports.getRooms = async (req, res) => {
     }
 
     const rooms = await Room.find(query)
-      .populate('leadParticipant', 'name avatar')
+      .populate('leadParticipant', 'firstName lastName avatar')
       .sort({ createdAt: -1 });
 
-    res.json(rooms);
+    // Format room display info (for DMs, personalize recipient info for requester)
+    const formattedRooms = rooms.map(room => {
+      const roomObj = room.toObject();
+      if (room.isGroup === false && requesterId) {
+        const otherParticipant = (room.participants || []).find(p => String(p.id) !== String(requesterId));
+        if (otherParticipant) {
+          roomObj.otherParticipant = otherParticipant;
+          if (!roomObj.name || roomObj.name === 'Direct Message') {
+            roomObj.displayName = otherParticipant.name;
+          }
+        }
+      }
+      return roomObj;
+    });
+
+    res.json(formattedRooms);
   } catch (error) {
     console.error('getRooms error:', error);
     res.status(500).json({ message: 'Server Error' });
@@ -129,7 +263,37 @@ exports.getRooms = async (req, res) => {
 };
 
 /**
- * @desc    Get message history for a room (Protected: only participants or owner can read private rooms)
+ * @desc    (Organizer Only) Get all rooms in an event for audit/moderation
+ * @route   GET /api/chat/admin/all-rooms/:eventId
+ * @access  Private (Organizer only)
+ */
+exports.getAllRoomsAdmin = async (req, res) => {
+  const { eventId } = req.params;
+
+  if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+    return res.status(400).json({ message: 'Valid event ID is required' });
+  }
+
+  try {
+    const eventObj = await Event.findById(eventId);
+    if (!eventObj) return res.status(404).json({ message: 'Event not found' });
+    if (!req.user || eventObj.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only the event organizer can access all rooms' });
+    }
+
+    const rooms = await Room.find({ event: eventId })
+      .populate('leadParticipant', 'firstName lastName avatar')
+      .sort({ createdAt: -1 });
+
+    res.json(rooms);
+  } catch (error) {
+    console.error('getAllRoomsAdmin error:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+/**
+ * @desc    Get message history for a room (Protected: only participants can read private rooms)
  * @route   GET /api/chat/messages/:roomId
  * @access  Private (multiAuth)
  */
@@ -149,14 +313,20 @@ exports.getMessages = async (req, res) => {
     const requesterId = req.user ? req.user.id : req.attendee?.id;
     const isDirect = (room.isGroup === false || room.type === 'private');
 
-    // Access control for direct messages: only allowed participants or event owner
+    // Access control for direct messages: only allowed participants or explicit audit
     if (isDirect) {
-      const eventObj = await Event.findById(room.event);
-      const isOwner = Boolean(req.user && eventObj && eventObj.owner.toString() === req.user.id);
       const isParticipant = Boolean(requesterId && room.participantIds && room.participantIds.includes(String(requesterId)));
       const isCreator = Boolean(requesterId && room.createdBy && room.createdBy.toString() === String(requesterId));
 
-      if (!isOwner && !isParticipant && !isCreator) {
+      let canAccess = isParticipant || isCreator;
+      if (!canAccess && req.user && req.query.audit === 'true') {
+        const eventObj = await Event.findById(room.event);
+        if (eventObj && eventObj.owner.toString() === req.user.id) {
+          canAccess = true;
+        }
+      }
+
+      if (!canAccess) {
         return res.status(403).json({ message: 'Access denied: You are not authorized to view this private conversation' });
       }
     }
@@ -168,7 +338,7 @@ exports.getMessages = async (req, res) => {
 
     const total = await Message.countDocuments({ room: roomId });
     const messages = await Message.find({ room: roomId })
-      .populate('sender', 'name avatar')
+      .populate('sender', 'name firstName lastName avatar')
       .sort({ createdAt: -1 })
       .skip(startIndex)
       .limit(limit);
@@ -189,7 +359,7 @@ exports.getMessages = async (req, res) => {
 };
 
 /**
- * @desc    Send a message to a room (Protected: only authorized users can post to private rooms)
+ * @desc    Send a message to a room (Protected: checks DM participant & announcement restrictions, broadcasts via Socket)
  * @route   POST /api/chat/messages/:roomId
  * @access  Private (multiAuth)
  */
@@ -208,16 +378,45 @@ exports.sendMessage = async (req, res) => {
     }
 
     const requesterId = req.user ? req.user.id : req.attendee?.id;
+    if (!requesterId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     const senderModel = req.user ? 'User' : 'Attendee';
     const isDirect = (room.isGroup === false || room.type === 'private');
 
-    if (isDirect) {
-      const eventObj = await Event.findById(room.event);
-      const isOwner = Boolean(req.user && eventObj && eventObj.owner.toString() === req.user.id);
-      const isParticipant = Boolean(requesterId && room.participantIds && room.participantIds.includes(String(requesterId)));
+    const eventObj = await Event.findById(room.event);
+    if (!eventObj) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    const isOwner = Boolean(req.user && eventObj.owner.toString() === req.user.id);
 
-      if (!isOwner && !isParticipant) {
+    // Direct room check: only participants can send messages
+    if (isDirect) {
+      const isParticipant = Boolean(room.participantIds && room.participantIds.includes(String(requesterId)));
+      if (!isParticipant) {
         return res.status(403).json({ message: 'Access denied: You cannot send messages to this private conversation' });
+      }
+    }
+
+    // Announcement room check: only organizers can post
+    if (room.type === 'announcement' && !isOwner) {
+      return res.status(403).json({ message: 'Only event organizers can post in announcement channels' });
+    }
+
+    // Resolve sender display name and avatar if not provided
+    let finalSenderName = senderName;
+    let finalSenderAvatar = senderAvatar;
+    if (!finalSenderName) {
+      if (req.user) {
+        const u = await User.findById(requesterId).select('firstName lastName orgName avatar');
+        if (u) {
+          finalSenderName = u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Organizer';
+          finalSenderAvatar = u.avatar || null;
+        }
+      } else if (req.attendee) {
+        const a = await Attendee.findById(requesterId).select('name');
+        if (a) finalSenderName = a.name;
       }
     }
 
@@ -225,14 +424,37 @@ exports.sendMessage = async (req, res) => {
       room: roomId,
       sender: requesterId,
       senderModel,
-      senderName,
-      senderAvatar,
+      senderName: finalSenderName,
+      senderAvatar: finalSenderAvatar,
       content,
       type: type || 'user_message'
     });
 
     await message.save();
-    res.status(201).json(message);
+
+    // Populate sender object
+    let populatedMessage = await Message.findById(message._id).populate('sender', 'name firstName lastName avatar');
+    if (!populatedMessage?.sender || typeof populatedMessage.sender !== 'object') {
+      populatedMessage = {
+        ...populatedMessage.toObject(),
+        sender: {
+          _id: requesterId,
+          id: requesterId,
+          name: finalSenderName || 'User',
+          avatar: finalSenderAvatar || null
+        }
+      };
+    }
+
+    // Broadcast to real-time WebSocket room
+    try {
+      const io = getIO();
+      io.to(roomId).emit('receive_message', populatedMessage);
+    } catch (socketErr) {
+      // Socket.IO may not be initialized in non-server tests
+    }
+
+    res.status(201).json(populatedMessage);
   } catch (error) {
     console.error('sendMessage error:', error);
     res.status(500).json({ message: 'Server Error' });

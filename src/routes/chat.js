@@ -17,6 +17,24 @@ router.post('/rooms', multiAuth, chatController.createRoom);
 
 /**
  * @openapi
+ * /api/chat/participants/{eventId}:
+ *   get:
+ *     tags: [Chat]
+ *     summary: Get participant directory for an event (Organizer + Verified Attendees)
+ */
+router.get('/participants/:eventId', multiAuth, chatController.getParticipants);
+
+/**
+ * @openapi
+ * /api/chat/admin/all-rooms/{eventId}:
+ *   get:
+ *     tags: [Chat]
+ *     summary: (Organizer only) Get all chat rooms for moderation
+ */
+router.get('/admin/all-rooms/:eventId', multiAuth, chatController.getAllRoomsAdmin);
+
+/**
+ * @openapi
  * /api/chat/rooms/{eventId}:
  *   get:
  *     tags: [Chat]

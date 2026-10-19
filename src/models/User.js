@@ -171,6 +171,15 @@ const UserSchema = new mongoose.Schema({
   },
 });
 
+// Virtual for user full name
+UserSchema.virtual('name').get(function () {
+  const full = `${this.firstName || ''} ${this.lastName || ''}`.trim();
+  return full || this.orgName || 'User';
+});
+
+UserSchema.set('toJSON', { virtuals: true });
+UserSchema.set('toObject', { virtuals: true });
+
 
 // Encrypt password using bcrypt
 UserSchema.pre('save', async function () {
