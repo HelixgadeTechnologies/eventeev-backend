@@ -4,7 +4,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const app = require('./app');
-const Message = require('./models/Message');
 const startEventStatusTask = require('./tasks/statusTask');
 const startReminderTask = require('./tasks/reminderTask');
 
@@ -33,6 +32,7 @@ const io = initSocket(server);
 
 // socket.js handles the connection and notification rooms.
 // We'll keep the message logic here for now, but use the io instance from initSocket.
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const Room = require('./models/Room');
 const Message = require('./models/Message');
