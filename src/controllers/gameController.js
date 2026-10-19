@@ -28,6 +28,23 @@ exports.createQuiz = async (req, res) => {
       return res.status(403).json({ message: 'User not authorized to create quizzes for this event' });
     }
 
+    // Resolve author name and avatar from creator profile
+    const User = require('../models/User');
+    let authorName = req.body.author;
+    let authorAvatar = req.body.authorAvatar;
+    if (req.user) {
+      const u = await User.findById(req.user.id).select('firstName lastName name orgName avatar email');
+      if (u) {
+        const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || u.orgName || u.email;
+        if (!authorName || authorName === 'Eventeev Staff' || authorName === 'Organizer') {
+          authorName = fullName;
+        }
+        if (!authorAvatar && u.avatar) {
+          authorAvatar = u.avatar;
+        }
+      }
+    }
+
     const quizTargetId = req.body.id || req.body._id;
     if (quizTargetId && mongoose.Types.ObjectId.isValid(quizTargetId)) {
       const existing = await Quiz.findById(quizTargetId);
@@ -37,8 +54,14 @@ exports.createQuiz = async (req, res) => {
         existing.category = req.body.category || existing.category;
         existing.thumbnail = req.body.thumbnail || existing.thumbnail;
         existing.questions = req.body.questions || existing.questions;
-        if (req.user && req.user.name) {
-          existing.author = req.user.name;
+        if (authorName && authorName !== 'Eventeev Staff') {
+          existing.author = authorName;
+        }
+        if (authorAvatar) {
+          existing.authorAvatar = authorAvatar;
+        }
+        if (req.user) {
+          existing.createdBy = req.user.id;
         }
         await existing.save();
         return res.json(existing);
@@ -48,7 +71,8 @@ exports.createQuiz = async (req, res) => {
     const quiz = new Quiz({
       ...req.body,
       createdBy: req.user ? req.user.id : undefined,
-      author: (req.user && req.user.name) || (event && event.organizer) || req.body.author || "Organizer"
+      author: authorName || (event && event.organizer) || "Organizer",
+      authorAvatar: authorAvatar || undefined
     });
 
     await quiz.save();
@@ -170,20 +194,38 @@ exports.cloneQuiz = async (req, res) => {
  */
 exports.getQuiz = async (req, res) => {
   try {
-    const quiz = await Quiz.findById(req.params.id);
+    const quiz = await Quiz.findById(req.params.id).populate('createdBy', 'firstName lastName name avatar orgName email');
     if (!quiz) return res.status(404).json({ message: 'Quiz not found' });
 
+    let event = null;
     // Check ownership only if this is a private event-specific quiz
     if (!quiz.isTemplate && quiz.eventId) {
-      const event = await Event.findById(quiz.eventId);
-      if (event && event.owner && req.user && event.owner.toString() !== req.user.id) {
+      event = await Event.findById(quiz.eventId).populate('owner', 'firstName lastName name avatar orgName email');
+      if (event && event.owner && req.user && (event.owner._id || event.owner).toString() !== req.user.id) {
         return res.status(403).json({ message: 'User not authorized to access this quiz' });
       }
     }
 
-    res.json(quiz);
+    const quizObj = quiz.toObject();
 
+    // If author is missing or still the placeholder default 'Eventeev Staff' or 'Organizer', resolve from creator profile or event owner
+    if (!quizObj.author || quizObj.author === 'Eventeev Staff' || quizObj.author === 'Organizer') {
+      if (quiz.createdBy && typeof quiz.createdBy === 'object') {
+        const u = quiz.createdBy;
+        const resolvedName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || u.orgName || u.email;
+        if (resolvedName) quizObj.author = resolvedName;
+        if (u.avatar) quizObj.authorAvatar = u.avatar;
+      } else if (event && event.owner && typeof event.owner === 'object') {
+        const u = event.owner;
+        const resolvedName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || u.orgName || u.email;
+        if (resolvedName) quizObj.author = resolvedName;
+        if (u.avatar) quizObj.authorAvatar = u.avatar;
+      }
+    }
+
+    res.json(quizObj);
   } catch (error) {
+    console.error('getQuiz error:', error);
     res.status(500).send('Server Error');
   }
 };

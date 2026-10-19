@@ -198,6 +198,13 @@ const QuizSchema = new mongoose.Schema({
     type: String,
     default: 'Eventeev Staff',
   },
+  authorAvatar: {
+    type: String,
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
   isVerified: {
     type: Boolean,
     default: true,
