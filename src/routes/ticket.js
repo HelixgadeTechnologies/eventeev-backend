@@ -1,8 +1,27 @@
 const express = require('express');
 const router = express.Router();
 const ticketController = require('../controllers/ticketController');
+const attendeeController = require('../controllers/attendeeController');
 const auth = require('../middleware/auth');
 
+/**
+ * @openapi
+ * /api/ticket/purchase:
+ *   post:
+ *     tags: [Tickets]
+ *     summary: Purchase ticket and register attendee
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [eventId, name, email]
+ *     responses:
+ *       201:
+ *         description: Ticket purchased and registered
+ */
+router.post('/purchase', attendeeController.registerAttendee);
 
 /**
  * @openapi

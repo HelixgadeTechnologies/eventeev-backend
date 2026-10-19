@@ -2,7 +2,6 @@ const Attendee = require('../models/Attendee');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const Event = require('../models/Event');
-
 const Ticket = require('../models/Ticket');
 const { createNotification } = require('./notificationController');
 const sendEmail = require('../utils/sendEmail');
@@ -12,6 +11,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const CalendarEvent = require('../models/CalendarEvent');
 const { addEventToGoogleCalendar } = require('../utils/googleCalendar');
+const jwt = require('jsonwebtoken');
 
 
 /**
@@ -33,7 +33,11 @@ const verifyPaystackPayment = async (reference, expectedAmount) => {
     
     // Check status and amount (Paystack amount is in kobo/cents)
     const isPaid = result.data.status === 'success';
-    const amountMatches = expectedAmount ? result.data.amount === Math.round(expectedAmount * 100) : true;
+    const expectedKobo = expectedAmount ? Math.round(expectedAmount * 100) : 0;
+    // Allow matching exact amount, requested_amount (when customer pays fees), or amount >= expectedKobo
+    const amountMatches = expectedAmount 
+      ? (result.data.amount === expectedKobo || result.data.requested_amount === expectedKobo || result.data.amount >= expectedKobo)
+      : true;
 
     if (!isPaid) return { success: false, message: 'Transaction was not successful' };
     if (!amountMatches) return { success: false, message: 'Payment amount mismatch' };
@@ -240,9 +244,34 @@ exports.coreRegister = coreRegister;
  * @access  Public
  */
 exports.registerAttendee = async (req, res) => {
-  const { eventId, name, email, ticketId, paymentReference, amount } = req.body;
+  let { eventId, name, email, ticketId, paymentReference, amount } = req.body;
+
+  // Flexible parameter extraction to support various frontend checkout formats
+  eventId = eventId || req.body.event_id;
+  email = email || req.body.customerEmail || req.body.emailAddress;
+  name = name || (req.body.firstName ? `${req.body.firstName} ${req.body.lastName || ''}`.trim() : null);
+  ticketId = ticketId || req.body.ticket_id || (Array.isArray(req.body.tickets) && req.body.tickets[0]?.ticketId);
+  paymentReference = paymentReference || req.body.reference || req.body.paystackReference || req.body.ref;
+  amount = amount !== undefined ? amount : req.body.totalAmount;
 
   try {
+    // If ticketId is provided but eventId is missing, resolve eventId from ticket
+    if (!eventId && ticketId) {
+      const ticketDoc = await Ticket.findById(ticketId);
+      if (ticketDoc) eventId = ticketDoc.eventId;
+    }
+
+    // If pending registration exists with this paymentReference, resolve missing fields
+    if (paymentReference && (!eventId || !email || !name || !ticketId)) {
+      const pending = await Attendee.findOne({ paymentReference });
+      if (pending) {
+        if (!eventId) eventId = pending.eventId;
+        if (!email) email = pending.email;
+        if (!name) name = pending.name;
+        if (!ticketId) ticketId = pending.ticketId;
+      }
+    }
+
     // 1. Validate Ticket and Amount before verification
     const ticket = ticketId ? await Ticket.findById(ticketId) : null;
     const isDonation = ticket && ticket.type?.toLowerCase() === 'donation';
@@ -284,9 +313,19 @@ exports.registerAttendee = async (req, res) => {
  * @access  Public
  */
 exports.googleRegisterAttendee = async (req, res) => {
-  const { eventId, idToken, ticketId, paymentReference, amount } = req.body;
+  let { eventId, idToken, ticketId, paymentReference, amount } = req.body;
+
+  eventId = eventId || req.body.event_id;
+  ticketId = ticketId || req.body.ticket_id || (Array.isArray(req.body.tickets) && req.body.tickets[0]?.ticketId);
+  paymentReference = paymentReference || req.body.reference || req.body.paystackReference || req.body.ref;
+  amount = amount !== undefined ? amount : req.body.totalAmount;
 
   try {
+    if (!eventId && ticketId) {
+      const ticketDoc = await Ticket.findById(ticketId);
+      if (ticketDoc) eventId = ticketDoc.eventId;
+    }
+
     // 1. Verify Google ID Token
     const ticketObj = await client.verifyIdToken({
       idToken,
@@ -632,8 +671,6 @@ exports.downloadTicketPDF = async (req, res) => {
     res.status(500).send('Error generating PDF');
   }
 };
-
-const jwt = require('jsonwebtoken');
 
 /**
  * @desc    Login attendee

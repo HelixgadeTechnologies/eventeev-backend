@@ -1,4 +1,8 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
+const Event = require('../models/Event');
+const Attendee = require('../models/Attendee');
+const Ticket = require('../models/Ticket');
 const { coreRegister } = require('./attendeeController');
 
 /**
@@ -9,12 +13,14 @@ const { coreRegister } = require('./attendeeController');
 exports.handlePaystackWebhook = async (req, res) => {
   try {
     // 1. Verify Paystack Signature
+    const rawBody = req.rawBody || JSON.stringify(req.body);
     const hash = crypto
       .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
-      .update(JSON.stringify(req.body))
+      .update(rawBody)
       .digest('hex');
 
     if (hash !== req.headers['x-paystack-signature']) {
+      console.warn('[Paystack Webhook] Invalid signature received.');
       return res.status(401).json({ message: 'Invalid signature' });
     }
 
@@ -23,12 +29,21 @@ exports.handlePaystackWebhook = async (req, res) => {
     // 2. Handle 'charge.success'
     if (event.event === 'charge.success') {
       const { reference, amount, metadata, customer } = event.data;
+      const email = customer?.email;
       
-      // metadata should contain registration details
-      const { eventId, ticketId, name, googleId } = metadata || {};
-      const email = customer.email;
+      // Look up any pending attendee created during initializePayment
+      let pendingAttendee = null;
+      if (reference) {
+        pendingAttendee = await Attendee.findOne({ paymentReference: reference });
+      }
 
-      if (eventId && name) {
+      // Metadata or pending attendee details
+      const eventId = metadata?.eventId || pendingAttendee?.eventId;
+      const ticketId = metadata?.ticketId || pendingAttendee?.ticketId;
+      const name = metadata?.name || pendingAttendee?.name || `${customer?.first_name || ''} ${customer?.last_name || ''}`.trim() || 'Attendee';
+      const googleId = metadata?.googleId || pendingAttendee?.googleId;
+
+      if (eventId && email) {
         console.log(`[Webhook] Processing successful payment for ${email} (Event: ${eventId})`);
         
         try {
@@ -64,11 +79,6 @@ exports.handlePaystackWebhook = async (req, res) => {
     res.status(500).send('Webhook Error');
   }
 };
-
-const Event = require('../models/Event');
-const Attendee = require('../models/Attendee');
-const mongoose = require('mongoose');
-const Ticket = require('../models/Ticket');
 
 /**
  * @desc    Initialize Paystack Transaction
