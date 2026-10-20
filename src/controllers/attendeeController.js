@@ -783,8 +783,8 @@ exports.resendConfirmationEmail = async (req, res) => {
       return res.status(404).json({ message: 'Attendee record not found' });
     }
 
-    await sendRegistrationConfirmationEmail(attendee);
-    res.json({ success: true, message: `Confirmation email sent to ${attendee.email}` });
+    const delivery = await sendRegistrationConfirmationEmail(attendee);
+    res.json({ success: true, message: `Confirmation email sent to ${attendee.email}`, delivery });
   } catch (error) {
     console.error('[Resend Confirmation] Error:', error);
     res.status(500).json({ message: 'Failed to send confirmation email', error: error.message });
