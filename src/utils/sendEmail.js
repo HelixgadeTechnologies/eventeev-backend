@@ -43,7 +43,9 @@ try {
 
 const sendEmail = async (options) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Port 587 with STARTTLS (port 465 is blocked on Render)
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASS,
