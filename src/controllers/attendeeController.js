@@ -791,4 +791,32 @@ exports.resendConfirmationEmail = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Check which email provider is currently configured and active
+ * @route   GET /api/attendee/email-status
+ * @access  Public
+ */
+exports.getEmailProviderStatus = (req, res) => {
+  const brevoApiKey = process.env.BREVO_API_KEY || process.env.BREVO_KEY || process.env.BREVO_API || process.env.SENDINBLUE_API_KEY || process.env.BREVO_SECRET_KEY || process.env.BREVO_TOKEN;
+  const resendApiKey = process.env.RESEND_API_KEY || process.env.RESEND_KEY || process.env.RESEND_API;
+  const sendgridApiKey = process.env.SENDGRID_API_KEY || process.env.SENDGRID_KEY;
+
+  let activeProvider = 'smtp';
+  if (brevoApiKey) activeProvider = 'brevo';
+  else if (resendApiKey) activeProvider = 'resend';
+  else if (sendgridApiKey) activeProvider = 'sendgrid';
+
+  res.json({
+    activeProvider,
+    brevoConfigured: !!brevoApiKey,
+    brevoSenderConfigured: !!(process.env.BREVO_SENDER_EMAIL || process.env.BREVO_EMAIL || process.env.EMAIL_USER),
+    resendConfigured: !!resendApiKey,
+    sendgridConfigured: !!sendgridApiKey,
+    smtpUserConfigured: !!process.env.EMAIL_USER,
+    smtpPort: parseInt(process.env.EMAIL_PORT, 10) || 587,
+    isRender: !!process.env.RENDER,
+  });
+};
+
+
 

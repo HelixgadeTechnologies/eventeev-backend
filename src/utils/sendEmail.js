@@ -53,13 +53,14 @@ const sendEmail = async (options) => {
   const fromName = process.env.FROM_NAME || 'Eventeev';
 
   // 1. Check for Brevo (Sendinblue) HTTP API (Free: 300 emails/day, no custom domain required)
-  if (process.env.BREVO_API_KEY) {
-    const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.EMAIL_USER || 'support@eventeev.com';
+  const brevoApiKey = process.env.BREVO_API_KEY || process.env.BREVO_KEY || process.env.BREVO_API || process.env.SENDINBLUE_API_KEY || process.env.BREVO_SECRET_KEY || process.env.BREVO_TOKEN;
+  if (brevoApiKey) {
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.BREVO_EMAIL || process.env.EMAIL_USER || 'support@eventeev.com';
     console.log(`[Email] Dispatching via Brevo HTTPS API to ${recipientEmail}...`);
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'api-key': process.env.BREVO_API_KEY,
+        'api-key': brevoApiKey.trim(),
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
@@ -83,13 +84,14 @@ const sendEmail = async (options) => {
   }
 
   // 2. Check for Resend HTTP API (Free: 100 emails/day, 3000/month)
-  if (process.env.RESEND_API_KEY) {
+  const resendApiKey = process.env.RESEND_API_KEY || process.env.RESEND_KEY || process.env.RESEND_API;
+  if (resendApiKey) {
     const resendFrom = process.env.RESEND_FROM_EMAIL || (process.env.EMAIL_USER ? `${fromName} <${process.env.EMAIL_USER}>` : `${fromName} <onboarding@resend.dev>`);
     console.log(`[Email] Dispatching via Resend HTTPS API to ${recipientEmail}...`);
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Authorization': `Bearer ${resendApiKey.trim()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -112,13 +114,14 @@ const sendEmail = async (options) => {
   }
 
   // 3. Check for SendGrid HTTP API
-  if (process.env.SENDGRID_API_KEY) {
+  const sendgridApiKey = process.env.SENDGRID_API_KEY || process.env.SENDGRID_KEY;
+  if (sendgridApiKey) {
     const senderEmail = process.env.SENDGRID_FROM_EMAIL || process.env.EMAIL_USER || 'support@eventeev.com';
     console.log(`[Email] Dispatching via SendGrid HTTPS API to ${recipientEmail}...`);
     const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+        'Authorization': `Bearer ${sendgridApiKey.trim()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

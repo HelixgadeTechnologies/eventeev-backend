@@ -263,4 +263,17 @@ router.get('/my-events', attendeeAuth, attendeeController.getMyEvents);
  */
 router.post('/resend-confirmation', attendeeController.resendConfirmationEmail);
 
+/**
+ * @openapi
+ * /api/attendee/email-status:
+ *   get:
+ *     tags: [Attendees]
+ *     summary: Check active email transport provider
+ *     responses:
+ *       200:
+ *         description: Active provider status
+ */
+router.get('/email-status', attendeeController.getEmailProviderStatus);
+
 module.exports = router;
+
