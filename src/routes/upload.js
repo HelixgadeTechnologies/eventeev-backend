@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { parser } = require('../config/cloudinary');
 const uploadController = require('../controllers/uploadController');
-const auth = require('../middleware/auth');
+const multiAuth = require('../middleware/multiAuth');
 
 /**
  * @openapi
@@ -36,7 +36,7 @@ const auth = require('../middleware/auth');
  *                   type: string
  */
 // Wrapped Multer middleware to catch errors
-router.post('/', auth, (req, res) => {
+router.post('/', multiAuth, (req, res) => {
   parser.single('image')(req, res, (err) => {
     if (err) {
       console.error('[Multer/Cloudinary Error]:', err);
