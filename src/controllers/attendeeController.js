@@ -210,25 +210,7 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
 
   // 8. Send Registration Email to Attendee
   try {
-    const ticketType = ticket ? ticket.name : 'General Admission';
-    const amountPaid = expectedAmount > 0 ? `₦${expectedAmount}` : 'Free';
-
-    const htmlTemplate = generateRegistrationEmail({
-      name,
-      event,
-      ticketType,
-      orderId,
-      qrCodeUrl,
-      amountPaid,
-      attendeeId: attendee._id
-    });
-
-    await sendEmail({
-      email: email,
-      subject: `You’re In! Confirmation for ${event.title}`,
-      html: htmlTemplate
-    });
-
+    await sendRegistrationConfirmationEmail(attendee);
   } catch (emailErr) {
     console.error('[Core Register] Registration email sending error:', emailErr);
   }
@@ -236,6 +218,43 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
   return { success: true, attendee };
 };
 
+/**
+ * Helper to construct and send event registration confirmation email
+ */
+const sendRegistrationConfirmationEmail = async (attendee) => {
+  const event = await Event.findById(attendee.eventId);
+  if (!event) throw new Error('Event not found');
+
+  let ticket = null;
+  if (attendee.ticketId) {
+    ticket = await Ticket.findById(attendee.ticketId);
+  }
+
+  const ticketType = ticket ? ticket.name : 'General Admission';
+  const amountPaid = attendee.amount > 0 ? `₦${attendee.amount}` : 'Free';
+
+  const htmlTemplate = generateRegistrationEmail({
+    name: attendee.name,
+    event,
+    ticketType,
+    orderId: attendee.orderId,
+    qrCodeUrl: attendee.qrCode,
+    amountPaid,
+    attendeeId: attendee._id
+  });
+
+  const backendUrl = process.env.BACKEND_URL || 'https://eventeevapi.onrender.com';
+  const fallbackText = `Hi ${attendee.name},\n\nYou're officially registered for ${event.title}.\nOrder ID: ${attendee.orderId}\nTicket: ${ticketType}\n\nView and download your ticket: ${backendUrl}/api/attendee/ticket/${attendee._id}/download\n\nWe look forward to seeing you!`;
+
+  return await sendEmail({
+    email: attendee.email,
+    subject: `You're In! Confirmation for ${event.title}`,
+    message: fallbackText,
+    html: htmlTemplate
+  });
+};
+
+exports.sendRegistrationConfirmationEmail = sendRegistrationConfirmationEmail;
 exports.coreRegister = coreRegister;
 
 /**
@@ -291,6 +310,11 @@ exports.registerAttendee = async (req, res) => {
     if (result.alreadyRegistered) {
       // Check if webhook already processed this exact payment
       if (expectedAmount > 0 && paymentReference && paymentReference === result.attendee.paymentReference) {
+        try {
+          await sendRegistrationConfirmationEmail(result.attendee);
+        } catch (resendErr) {
+          console.error('[Register Attendee] Auto-resend confirmation email error:', resendErr.message);
+        }
         const payload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
         return res.status(200).json({ token, attendee: result.attendee });
@@ -730,4 +754,41 @@ exports.getMyEvents = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Resend confirmation email for an attendee
+ * @route   POST /api/attendee/resend-confirmation
+ * @access  Public
+ */
+exports.resendConfirmationEmail = async (req, res) => {
+  const { email, eventId, orderId, paymentReference } = req.body;
+
+  try {
+    let query = {};
+    if (orderId) {
+      query.orderId = orderId;
+    } else if (paymentReference) {
+      query.paymentReference = paymentReference;
+    } else if (email && eventId) {
+      query.email = email;
+      query.eventId = eventId;
+    } else if (email) {
+      query.email = email;
+    } else {
+      return res.status(400).json({ message: 'Please provide email and eventId, orderId, or paymentReference' });
+    }
+
+    const attendee = await Attendee.findOne(query).sort({ createdAt: -1 });
+    if (!attendee) {
+      return res.status(404).json({ message: 'Attendee record not found' });
+    }
+
+    await sendRegistrationConfirmationEmail(attendee);
+    res.json({ success: true, message: `Confirmation email sent to ${attendee.email}` });
+  } catch (error) {
+    console.error('[Resend Confirmation] Error:', error);
+    res.status(500).json({ message: 'Failed to send confirmation email', error: error.message });
+  }
+};
+
 

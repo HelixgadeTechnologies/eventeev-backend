@@ -238,4 +238,29 @@ router.post('/login', attendeeController.loginAttendee);
  */
 router.get('/my-events', attendeeAuth, attendeeController.getMyEvents);
 
+/**
+ * @openapi
+ * /api/attendee/resend-confirmation:
+ *   post:
+ *     tags: [Attendees]
+ *     summary: Resend registration confirmation email to an attendee
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email: { type: string }
+ *               eventId: { type: string }
+ *               orderId: { type: string }
+ *               paymentReference: { type: string }
+ *     responses:
+ *       200:
+ *         description: Confirmation email sent successfully
+ *       404:
+ *         description: Attendee record not found
+ */
+router.post('/resend-confirmation', attendeeController.resendConfirmationEmail);
+
 module.exports = router;
