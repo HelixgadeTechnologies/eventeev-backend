@@ -226,6 +226,47 @@ router.post('/login', attendeeController.loginAttendee);
 
 /**
  * @openapi
+ * /api/attendee/google-login:
+ *   post:
+ *     tags: [Attendees]
+ *     summary: Login an attendee using Google ID token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [idToken]
+ *             properties:
+ *               idToken: { type: string }
+ *     responses:
+ *       200:
+ *         description: Login successful, returns token and attendee
+ *       400:
+ *         description: Invalid Google token
+ *       404:
+ *         description: No attendee registration found
+ */
+router.post('/google-login', attendeeController.googleLoginAttendee);
+
+/**
+ * @openapi
+ * /api/attendee/me:
+ *   get:
+ *     tags: [Attendees]
+ *     summary: Get current authenticated attendee profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Attendee profile
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/me', attendeeAuth, attendeeController.getAttendeeMe);
+
+/**
+ * @openapi
  * /api/attendee/my-events:
  *   get:
  *     tags: [Attendees]

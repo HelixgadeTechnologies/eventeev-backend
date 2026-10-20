@@ -697,15 +697,29 @@ exports.downloadTicketPDF = async (req, res) => {
 };
 
 /**
- * @desc    Login attendee
+ * @desc    Login attendee via Email + Order ID or Payment Reference
  * @route   POST /api/attendee/login
  * @access  Public
  */
 exports.loginAttendee = async (req, res) => {
-  const { email, orderId } = req.body;
+  const { email, orderId, paymentReference } = req.body;
 
   try {
-    const attendee = await Attendee.findOne({ email, orderId });
+    if (!email || (!orderId && !paymentReference)) {
+      return res.status(400).json({ message: 'Please provide email and either orderId or paymentReference' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const query = { email: normalizedEmail };
+    if (orderId) {
+      query.orderId = orderId.trim();
+    } else if (paymentReference) {
+      query.paymentReference = paymentReference.trim();
+    }
+
+    const attendee = await Attendee.findOne(query)
+      .populate('eventId', 'title startDate endDate location bannerImage status')
+      .populate('ticketId', 'name price');
 
     if (!attendee) {
       return res.status(400).json({ message: 'Invalid Credentials' });
@@ -714,7 +728,8 @@ exports.loginAttendee = async (req, res) => {
     const payload = {
       attendee: {
         id: attendee.id,
-        email: attendee.email
+        email: attendee.email,
+        name: attendee.name
       }
     };
 
@@ -729,7 +744,78 @@ exports.loginAttendee = async (req, res) => {
     );
   } catch (error) {
     console.error('[Login Attendee] Error:', error);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+/**
+ * @desc    Login attendee with Google ID token
+ * @route   POST /api/attendee/google-login
+ * @access  Public
+ */
+exports.googleLoginAttendee = async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    return res.status(400).json({ message: 'Google ID token is required' });
+  }
+
+  try {
+    const ticketObj = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticketObj.getPayload();
+    const { sub: googleId, email, name } = payload;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find any attendee registration for this email or googleId
+    const attendee = await Attendee.findOne({
+      $or: [{ googleId }, { email: normalizedEmail }]
+    })
+      .sort({ createdAt: -1 })
+      .populate('eventId', 'title startDate endDate location bannerImage status')
+      .populate('ticketId', 'name price');
+
+    if (!attendee) {
+      return res.status(404).json({ message: 'No registered event tickets found for this Google account' });
+    }
+
+    const tokenPayload = {
+      attendee: {
+        id: attendee.id,
+        email: attendee.email,
+        name: attendee.name || name
+      }
+    };
+
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, attendee });
+  } catch (error) {
+    console.error('[Google Login Attendee] Error:', error);
+    res.status(400).json({ message: error.message || 'Invalid Google token' });
+  }
+};
+
+/**
+ * @desc    Get current authenticated attendee profile
+ * @route   GET /api/attendee/me
+ * @access  Private (Attendee)
+ */
+exports.getAttendeeMe = async (req, res) => {
+  try {
+    const attendee = await Attendee.findById(req.attendee.id)
+      .populate('eventId', 'title startDate endDate location bannerImage status')
+      .populate('ticketId', 'name price');
+
+    if (!attendee) {
+      return res.status(404).json({ message: 'Attendee record not found' });
+    }
+
+    res.json({ success: true, attendee });
+  } catch (error) {
+    console.error('[Get Attendee Me] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
