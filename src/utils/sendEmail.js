@@ -55,7 +55,7 @@ const sendEmail = async (options) => {
   // 1. Check for Brevo (Sendinblue) HTTP API (Free: 300 emails/day, no custom domain required)
   const brevoApiKey = process.env.BREVO_API_KEY || process.env.BREVO_KEY || process.env.BREVO_API || process.env.SENDINBLUE_API_KEY || process.env.BREVO_SECRET_KEY || process.env.BREVO_TOKEN;
   if (brevoApiKey) {
-    const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.BREVO_EMAIL || process.env.EMAIL_USER || 'support@eventeev.com';
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.BREVO_EMAIL || process.env.EMAIL_USER || 'weareeventeev@gmail.com';
     console.log(`[Email] Dispatching via Brevo HTTPS API to ${recipientEmail}...`);
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
