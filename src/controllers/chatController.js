@@ -87,8 +87,13 @@ exports.getParticipants = async (req, res) => {
 
     const attendeesList = await Attendee.find({
       eventId: eventQuery,
-      status: { $ne: 'cancelled' }
-    }).select('name email avatar status createdAt');
+      status: { $ne: 'cancelled' },
+      $or: [
+        { isCheckedIn: true },
+        { checkInTime: { $exists: true, $ne: null } },
+        { status: 'verified' }
+      ]
+    }).select('name email avatar status isCheckedIn checkInTime createdAt');
 
     const attendees = attendeesList.map(att => ({
       id: String(att._id),
@@ -97,6 +102,8 @@ exports.getParticipants = async (req, res) => {
       role: 'attendee',
       modelType: 'Attendee',
       status: att.status,
+      isCheckedIn: Boolean(att.isCheckedIn || att.checkInTime),
+      checkInTime: att.checkInTime || null,
       isCurrentUser: String(att._id) === String(requesterId),
     }));
 

@@ -264,6 +264,7 @@ router.post('/google-login', attendeeController.googleLoginAttendee);
  *         description: Unauthorized
  */
 router.get('/me', attendeeAuth, attendeeController.getAttendeeMe);
+router.post('/check-in-self', attendeeAuth, attendeeController.checkInSelf);
 
 /**
  * @openapi

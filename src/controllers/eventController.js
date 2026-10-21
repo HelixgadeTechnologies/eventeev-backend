@@ -513,7 +513,17 @@ exports.connectToEvent = async (req, res) => {
     });
 
     if (attendee) {
-      // User is registered
+      // User is registered — auto-confirm check-in upon connecting to the event
+      if (!attendee.isCheckedIn) {
+        attendee.isCheckedIn = true;
+        attendee.checkInTime = attendee.checkInTime || new Date();
+        if (attendee.status === 'pending') {
+          attendee.status = 'verified';
+        }
+        await attendee.save().catch(err => {
+          console.warn('[connectToEvent] Error marking check-in:', err.message);
+        });
+      }
       return res.json({
         isRegistered: true,
         eventId: event._id,

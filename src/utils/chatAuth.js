@@ -18,11 +18,13 @@ async function assertAttendeeCheckedIn(attendeeId, eventId) {
     return { allowed: false, reason: 'Valid event ID is required', attendee: null };
   }
 
+  const eventObjectId = new mongoose.Types.ObjectId(eventId);
+
   const attendee = await Attendee.findOne({
     _id: attendeeId,
-    eventId: eventId,
+    eventId: { $in: [eventId, eventObjectId] },
     status: { $ne: 'cancelled' }
-  }).select('isCheckedIn status name eventId');
+  }).select('isCheckedIn status name eventId checkInTime');
 
   if (!attendee) {
     return { allowed: false, reason: 'You are not registered for this event', attendee: null };

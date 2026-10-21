@@ -742,6 +742,13 @@ exports.loginAttendee = async (req, res) => {
       return res.status(400).json({ message: 'Invalid Credentials' });
     }
 
+    if (!attendee.isCheckedIn) {
+      attendee.isCheckedIn = true;
+      attendee.checkInTime = attendee.checkInTime || new Date();
+      if (attendee.status === 'pending') attendee.status = 'verified';
+      await attendee.save().catch(() => {});
+    }
+
     const payload = {
       attendee: {
         id: attendee.id,
@@ -923,3 +930,47 @@ exports.getEmailProviderStatus = (req, res) => {
 
 
 
+
+/**
+ * @desc    Self check-in for an authenticated attendee entering the event portal
+ * @route   POST /api/attendee/check-in-self
+ * @access  Private (AttendeeAuth)
+ */
+exports.checkInSelf = async (req, res) => {
+  try {
+    const attendeeId = req.attendee?.id;
+    if (!attendeeId) {
+      return res.status(401).json({ message: 'Attendee authentication required' });
+    }
+
+    const attendee = await Attendee.findById(attendeeId);
+    if (!attendee) {
+      return res.status(404).json({ message: 'Attendee record not found' });
+    }
+
+    if (!attendee.isCheckedIn) {
+      attendee.isCheckedIn = true;
+      attendee.checkInTime = new Date();
+      if (attendee.status === 'pending') {
+        attendee.status = 'verified';
+      }
+      await attendee.save();
+    }
+
+    res.json({
+      message: 'Attendee checked in successfully',
+      isCheckedIn: true,
+      checkInTime: attendee.checkInTime,
+      attendee: {
+        id: attendee._id,
+        name: attendee.name,
+        email: attendee.email,
+        isCheckedIn: true,
+        status: attendee.status,
+      }
+    });
+  } catch (error) {
+    console.error('[checkInSelf] Error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
