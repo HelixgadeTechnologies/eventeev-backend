@@ -63,6 +63,7 @@ const AttendeeSchema = new mongoose.Schema({
   orderId: {
     type: String,
     unique: true,
+    sparse: true,
   },
   qrCode: {
     type: String,

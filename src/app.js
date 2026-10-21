@@ -24,15 +24,20 @@ app.use(cors(corsOptions));
 
 app.use(morgan("dev"));
 
-// Global Rate Limiting
+// Global Rate Limiting (generous ceiling for active attendees on venue WiFi)
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per window
+  max: 3000, // Sufficient for multi-attendee venue NATs and live polling
   message: { error: "Too many requests from this IP, please try again after 15 minutes" },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for real-time game polling and API documentation
+    return req.path.startsWith('/api/game/quiz/session') || req.path.startsWith('/api-docs');
+  },
 });
 app.use(globalLimiter);
+
 
 // Specific Rate Limiting for Auth
 const authLimiter = rateLimit({

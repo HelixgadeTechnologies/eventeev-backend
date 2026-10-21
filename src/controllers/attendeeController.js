@@ -190,11 +190,28 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
     // E11000 duplicate key error means race condition occurred
     if (err.code === 11000) {
       console.log(`[Core Register] Caught race condition for duplicate registration: ${email}`);
+      // Rollback ticket decrement to prevent permanent inventory loss
+      if (ticketId) {
+        try {
+          const restoredTicket = await Ticket.findByIdAndUpdate(
+            ticketId,
+            { $inc: { quantity: 1 } },
+            { new: true }
+          );
+          if (restoredTicket && restoredTicket.status === 'Sold Out' && restoredTicket.quantity > 0) {
+            restoredTicket.status = 'Available';
+            await restoredTicket.save();
+          }
+        } catch (rollbackErr) {
+          console.error('[Core Register] Failed to rollback ticket count:', rollbackErr.message);
+        }
+      }
       const existing = await Attendee.findOne({ eventId, email });
       return { alreadyRegistered: true, attendee: existing };
     }
     throw err;
   }
+
 
   // 6. Sync to Calendar (If user exists)
   await syncToCalendar(email, event);

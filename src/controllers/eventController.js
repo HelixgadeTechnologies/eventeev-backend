@@ -31,6 +31,11 @@ const ensureGeneralLobby = async (eventId, userId) => {
 };
 
 
+const getFrontendBaseUrl = () => {
+  if (!process.env.FRONTEND_URL) return 'https://eventeev.com';
+  return process.env.FRONTEND_URL.split(',')[0].trim();
+};
+
 /**
  * @desc    Get public event details by slug
  * @route   GET /api/event/public/:slug
@@ -61,7 +66,7 @@ exports.getPublicEventBySlug = async (req, res) => {
     const schedule = await Schedule.find({ eventId: event._id }).sort({ startTime: 1 });
 
     // Construct response with shareable URL (fallback to ID if slug is missing)
-    const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+    const baseUrl = `${getFrontendBaseUrl()}/${event.slug || event._id}`;
     const publicUrl = baseUrl;
 
     res.json({
@@ -416,7 +421,7 @@ exports.getEventById = async (req, res) => {
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
-    const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+    const baseUrl = `${getFrontendBaseUrl()}/${event.slug || event._id}`;
     const publicUrl = baseUrl;
     const schedule = await Schedule.find({ eventId: event._id }).sort({ startTime: 1 });
     
@@ -430,7 +435,7 @@ exports.getEventById = async (req, res) => {
     if (error.kind === 'ObjectId') {
       return res.status(404).json({ message: 'Event not found' });
     }
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 /**
@@ -462,7 +467,7 @@ exports.generateICS = async (req, res) => {
       `SUMMARY:${event.title}`,
       `DESCRIPTION:${event.description ? event.description.replace(/\n/g, '\\n') : ''}`,
       `LOCATION:${event.location || 'Online'}`,
-      `URL:${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`,
+      `URL:${getFrontendBaseUrl()}/${event.slug || event._id}`,
       'END:VEVENT',
       'END:VCALENDAR'
     ].join('\r\n');
@@ -475,7 +480,7 @@ exports.generateICS = async (req, res) => {
     res.send(icsContent);
   } catch (error) {
     console.error('[Generate ICS] Error:', error);
-    res.status(500).send('Error generating calendar file');
+    res.status(500).json({ message: 'Error generating calendar file' });
   }
 };
 
@@ -499,7 +504,7 @@ exports.connectToEvent = async (req, res) => {
       return res.status(404).json({ message: 'Event not found with the provided code' });
     }
 
-    const baseUrl = `${process.env.FRONTEND_URL || 'https://eventeev.com'}/${event.slug || event._id}`;
+    const baseUrl = `${getFrontendBaseUrl()}/${event.slug || event._id}`;
 
     // Check if user is registered for this event
     const attendee = await Attendee.findOne({ 

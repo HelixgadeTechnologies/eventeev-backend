@@ -116,6 +116,10 @@ exports.register = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
 
+  if (!email || !otp) {
+    return res.status(400).json({ message: 'Email and OTP are required' });
+  }
+
   try {
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
@@ -128,7 +132,7 @@ exports.verifyOtp = async (req, res) => {
     }
 
     // Verify OTP
-    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+    const hashedOtp = crypto.createHash('sha256').update(String(otp)).digest('hex');
     
     if (user.otpCode !== hashedOtp || user.otpExpire < Date.now()) {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
@@ -170,7 +174,7 @@ exports.verifyOtp = async (req, res) => {
     );
   } catch (error) {
     console.error(error.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -181,6 +185,10 @@ exports.verifyOtp = async (req, res) => {
  */
 exports.resendOtp = async (req, res) => {
   const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
 
   try {
     const user = await User.findOne({ email });
@@ -221,7 +229,7 @@ exports.resendOtp = async (req, res) => {
     res.json({ message: 'New OTP sent successfully' });
   } catch (error) {
     console.error(error.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -362,7 +370,9 @@ exports.forgotPassword = async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     // Create reset url
-    const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+    const frontendUrl = process.env.FRONTEND_URL
+      ? process.env.FRONTEND_URL.split(',')[0].trim()
+      : `${req.protocol}://${req.get('host')}`;
     const resetUrl = `${frontendUrl}/password-reset/${resetToken}`;
 
     const message = `You are receiving this email because you (or someone else) has requested the reset of a password. Please make a put request to: \n\n ${resetUrl}`;

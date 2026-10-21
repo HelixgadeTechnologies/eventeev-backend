@@ -19,7 +19,7 @@ exports.getSpeakersByEvent = async (req, res) => {
 
   } catch (error) {
     console.error('[Get Speakers] Error:', error);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -84,7 +84,7 @@ exports.createSpeaker = async (req, res) => {
       return res.status(400).json({ message: 'Invalid Event ID' });
     }
 
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -99,7 +99,8 @@ exports.getSpeaker = async (req, res) => {
     if (!speaker) return res.status(404).json({ message: 'Speaker not found' });
     res.json(speaker);
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Get Speaker] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -120,11 +121,49 @@ exports.updateSpeaker = async (req, res) => {
       return res.status(403).json({ message: 'User not authorized to update this speaker' });
     }
 
-    const updatedSpeaker = await Speaker.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const { 
+      firstName, 
+      lastName, 
+      title, 
+      company, 
+      bio, 
+      topic, 
+      photo, 
+      socialLinks,
+      twitter,
+      companyTwitter,
+      sessions
+    } = req.body;
+
+    const updateData = {};
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (title !== undefined) updateData.title = title;
+    if (company !== undefined) updateData.company = company;
+    if (bio !== undefined) updateData.bio = bio;
+    if (topic !== undefined) updateData.topic = topic;
+    if (photo !== undefined) updateData.photo = photo;
+    if (sessions !== undefined && Array.isArray(sessions)) updateData.sessions = sessions;
+
+    if (socialLinks !== undefined) {
+      updateData.socialLinks = socialLinks;
+    } else if (twitter !== undefined || companyTwitter !== undefined) {
+      updateData.socialLinks = {
+        twitter: twitter !== undefined ? twitter : (speaker.socialLinks?.twitter || ''),
+        companyTwitter: companyTwitter !== undefined ? companyTwitter : (speaker.socialLinks?.companyTwitter || '')
+      };
+    }
+
+    const updatedSpeaker = await Speaker.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
     res.json(updatedSpeaker);
 
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Update Speaker] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -149,7 +188,8 @@ exports.deleteSpeaker = async (req, res) => {
     res.json({ message: 'Speaker removed' });
 
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Delete Speaker] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -170,12 +210,18 @@ exports.manageSessions = async (req, res) => {
       return res.status(403).json({ message: 'User not authorized to manage sessions for this speaker' });
     }
 
+    const { sessions } = req.body;
+    if (!Array.isArray(sessions)) {
+      return res.status(400).json({ message: 'Sessions must be an array' });
+    }
+
     speaker.sessions = sessions;
     await speaker.save();
     res.json(speaker);
 
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Manage Sessions] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -188,13 +234,11 @@ exports.getSpeakerStats = async (req, res) => {
   try {
     const eventId = req.params.eventId;
 
-
     // Check if user owns the event
     const event = await Event.findById(eventId);
     if (!event || event.owner.toString() !== req.user.id) {
       return res.status(403).json({ message: 'User not authorized to access this event\'s speaker statistics' });
     }
-
     
     // Count total speakers
     const totalSpeakers = await Speaker.countDocuments({ eventId });
@@ -219,6 +263,6 @@ exports.getSpeakerStats = async (req, res) => {
     });
   } catch (error) {
     console.error('[Get Speaker Stats] Error:', error);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 };

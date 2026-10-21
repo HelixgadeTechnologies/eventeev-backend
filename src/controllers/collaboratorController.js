@@ -103,7 +103,7 @@ exports.addCollaborator = async (req, res) => {
       await event.save();
 
       // Send invitation onboarding email with link
-      const frontendUrl = process.env.FRONTEND_URL || 'https://eventeev.com';
+      const frontendUrl = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',')[0].trim() : 'https://eventeev.com';
       const inviteUrl = `${frontendUrl}/register?token=${inviteToken}&email=${encodeURIComponent(email)}`;
 
       try {

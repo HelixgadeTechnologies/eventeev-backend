@@ -22,7 +22,8 @@ exports.createTicket = async (req, res) => {
     await ticket.save();
     res.status(201).json(ticket);
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Create Ticket] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -43,11 +44,43 @@ exports.editTicket = async (req, res) => {
       return res.status(403).json({ message: 'User not authorized to update this ticket' });
     }
 
-    const updatedTicket = await Ticket.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const {
+      name,
+      type,
+      price,
+      suggestedAmount,
+      quantity,
+      startDate,
+      startTime,
+      endDate,
+      endTime,
+      description,
+      status
+    } = req.body;
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (type !== undefined) updateData.type = type;
+    if (price !== undefined) updateData.price = price;
+    if (suggestedAmount !== undefined) updateData.suggestedAmount = suggestedAmount;
+    if (quantity !== undefined) updateData.quantity = quantity;
+    if (startDate !== undefined) updateData.startDate = startDate;
+    if (startTime !== undefined) updateData.startTime = startTime;
+    if (endDate !== undefined) updateData.endDate = endDate;
+    if (endTime !== undefined) updateData.endTime = endTime;
+    if (description !== undefined) updateData.description = description;
+    if (status !== undefined) updateData.status = status;
+
+    const updatedTicket = await Ticket.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
     res.json(updatedTicket);
 
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Edit Ticket] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -72,7 +105,8 @@ exports.deleteTicket = async (req, res) => {
     res.json({ message: 'Ticket tier removed' });
 
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Delete Ticket] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -98,7 +132,8 @@ exports.updateTicketStatus = async (req, res) => {
     res.json(updatedTicket);
 
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Update Ticket Status] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -112,7 +147,8 @@ exports.getTicketsByEvent = async (req, res) => {
     const tickets = await Ticket.find({ eventId: req.params.eventId });
     res.json(tickets);
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Get Tickets By Event] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -137,6 +173,7 @@ exports.getAttendeesByTicket = async (req, res) => {
     res.json(attendees);
 
   } catch (error) {
-    res.status(500).send('Server Error');
+    console.error('[Get Attendees By Ticket] Error:', error);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
