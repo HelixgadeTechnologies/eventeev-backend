@@ -165,6 +165,10 @@ exports.createRoom = async (req, res) => {
       pIds.push(String(leadParticipant));
     }
 
+    if (isDirect && pIds.length < 2) {
+      return res.status(400).json({ message: 'Direct message requires at least one other participant' });
+    }
+
     // If it's a 1-on-1 direct room, check if an existing room between these participants already exists
     if (isDirect && pIds.length >= 2) {
       const existing = await Room.findOne({
@@ -266,10 +270,16 @@ exports.getRooms = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Format room display info (for DMs, personalize recipient info for requester)
-    const formattedRooms = rooms.map(room => {
+    const formattedRooms = await Promise.all(rooms.map(async (room) => {
       const roomObj = room.toObject();
       if (room.isGroup === false && requesterId) {
-        const otherParticipant = (room.participants || []).find(p => String(p.id) !== String(requesterId));
+        let otherParticipant = (room.participants || []).find(p => String(p.id) !== String(requesterId));
+        if (!otherParticipant && room.participantIds?.length) {
+          const otherId = room.participantIds.find(id => String(id) !== String(requesterId));
+          if (otherId) {
+            otherParticipant = await resolveParticipant(otherId);
+          }
+        }
         if (otherParticipant) {
           roomObj.otherParticipant = otherParticipant;
           if (!roomObj.name || roomObj.name === 'Direct Message') {
@@ -278,7 +288,7 @@ exports.getRooms = async (req, res) => {
         }
       }
       return roomObj;
-    });
+    }));
 
     res.json(formattedRooms);
   } catch (error) {

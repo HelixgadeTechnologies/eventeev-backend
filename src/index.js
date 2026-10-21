@@ -64,6 +64,7 @@ io.on('connection', (socket) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (decoded.user) socket.user = decoded.user;
       else if (decoded.attendee) socket.attendee = decoded.attendee;
+      else if (decoded.id) socket.attendee = { id: decoded.id, email: decoded.email, name: decoded.name };
     } catch (err) {
       // Token expired or invalid
     }
@@ -218,10 +219,15 @@ io.on('connection', (socket) => {
         }
       }
 
+      const effectiveSender = socket.user?.id || socket.attendee?.id || sender;
+      if (!effectiveSender) {
+        socket.emit('error', { message: 'Authentication required to send message' });
+        return;
+      }
+
       // Check permission if it's a private direct message room
       if (isDirect && roomDoc) {
-        const socketId = socket.user?.id || socket.attendee?.id || sender;
-        const isParticipant = socketId && roomDoc.participantIds && roomDoc.participantIds.includes(String(socketId));
+        const isParticipant = roomDoc.participantIds && roomDoc.participantIds.includes(String(effectiveSender));
 
         if (!isParticipant) {
           console.warn(`[Socket] Unauthorized send_message to private room ${room} by socket ${socket.id}`);
@@ -250,20 +256,20 @@ io.on('connection', (socket) => {
       let finalSenderAvatar = data.senderAvatar;
       if (!finalSenderName) {
         if (socket.user) {
-          const u = await User.findById(sender).select('firstName lastName orgName avatar');
+          const u = await User.findById(effectiveSender).select('firstName lastName orgName avatar');
           if (u) {
             finalSenderName = u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Organizer';
             finalSenderAvatar = u.avatar || null;
           }
         } else if (socket.attendee) {
-          const a = await Attendee.findById(sender).select('name');
+          const a = await Attendee.findById(effectiveSender).select('name');
           if (a) finalSenderName = a.name;
         }
       }
 
       const newMessage = new Message({
         room,
-        sender,
+        sender: effectiveSender,
         senderModel,
         senderName: finalSenderName,
         senderAvatar: finalSenderAvatar,
@@ -277,8 +283,8 @@ io.on('connection', (socket) => {
         populatedMessage = {
           ...populatedMessage.toObject(),
           sender: {
-            _id: sender,
-            id: sender,
+            _id: effectiveSender,
+            id: effectiveSender,
             name: finalSenderName || 'User',
             avatar: finalSenderAvatar || null
           }
