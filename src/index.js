@@ -141,6 +141,20 @@ io.on('connection', (socket) => {
     console.log(`[Socket] Socket ${socket.id} left quiz room ${room}`);
   });
 
+  socket.on('submit_quiz_answer', (data) => {
+    const rawPin = data?.pin || data?.sessionId;
+    const pin = rawPin ? rawPin.toString().replace(/\s+/g, '').trim() : null;
+    if (!pin) return;
+    const room = `quiz_${pin}`;
+    // Broadcast live answer event so the host display can update the participant answer counter in real-time
+    io.to(room).emit('answer_submitted', {
+      pin,
+      nickname: data?.nickname || 'Attendee',
+      questionIndex: data?.questionIndex,
+      optionIndex: data?.optionIndex ?? data?.answerIndex,
+    });
+  });
+
   socket.on('send_message', async (data) => {
     const { room, sender, content, type } = data;
     try {
