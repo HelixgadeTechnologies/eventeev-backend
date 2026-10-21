@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Attendee = require('../models/Attendee');
 const mongoose = require('mongoose');
 const { getIO } = require('../utils/socket');
+const { assertAttendeeCheckedIn } = require('../utils/chatAuth');
 
 /**
  * Helper to resolve participant profile info (User or Attendee)
@@ -61,24 +62,11 @@ exports.getParticipants = async (req, res) => {
     const requesterId = req.user ? req.user.id : req.attendee?.id;
     const isOwner = Boolean(req.user && event.owner && event.owner._id.toString() === req.user.id);
 
-    // If requester is not the event owner, verify registration (by _id or email)
+    // Attendees must be checked in to access chat participants
     if (!isOwner && req.attendee) {
-      let isReg = null;
-      if (mongoose.Types.ObjectId.isValid(req.attendee.id)) {
-        isReg = await Attendee.findOne({
-          $or: [
-            { _id: req.attendee.id, eventId },
-            ...(req.attendee.email ? [{ email: req.attendee.email, eventId }] : []),
-            { _id: req.attendee.id }
-          ]
-        });
-      } else if (req.attendee.email) {
-        isReg = await Attendee.findOne({
-          $or: [
-            { email: req.attendee.email, eventId },
-            { email: req.attendee.email }
-          ]
-        });
+      const { allowed, reason } = await assertAttendeeCheckedIn(req.attendee.id, eventId);
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
       }
     }
 
@@ -144,6 +132,14 @@ exports.createRoom = async (req, res) => {
 
     const requesterId = req.user ? req.user.id : req.attendee?.id;
     const isOwner = Boolean(req.user && eventObj.owner.toString() === req.user.id);
+
+    // Attendees must be checked in to create or access chat rooms
+    if (!isOwner && req.attendee) {
+      const { allowed, reason } = await assertAttendeeCheckedIn(req.attendee.id, targetEventId);
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+    }
 
     // Determine if this room is a 1-on-1 direct message
     const isDirect = (type === 'private' || isGroup === false);
@@ -222,6 +218,14 @@ exports.getRooms = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     const isOwner = Boolean(req.user && eventObj.owner.toString() === req.user.id);
+
+    // Attendees must be checked in to view rooms
+    if (!isOwner && req.attendee) {
+      const { allowed, reason } = await assertAttendeeCheckedIn(req.attendee.id, eventId);
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+    }
 
     let query;
     if (isOwner && req.query.allRooms === 'true') {
@@ -324,6 +328,14 @@ exports.getMessages = async (req, res) => {
       return res.status(404).json({ message: 'Room not found' });
     }
 
+    // Attendees must be checked in to view messages
+    if (req.attendee) {
+      const { allowed, reason } = await assertAttendeeCheckedIn(req.attendee.id, room.event.toString());
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+    }
+
     const requesterId = req.user ? req.user.id : req.attendee?.id;
     const isDirect = (room.isGroup === false || room.type === 'private');
 
@@ -404,6 +416,14 @@ exports.sendMessage = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
     const isOwner = Boolean(req.user && eventObj.owner.toString() === req.user.id);
+
+    // Attendees must be checked in to send messages
+    if (!isOwner && req.attendee) {
+      const { allowed, reason } = await assertAttendeeCheckedIn(req.attendee.id, eventObj._id.toString());
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+    }
 
     // Direct room check: only participants can send messages
     if (isDirect) {

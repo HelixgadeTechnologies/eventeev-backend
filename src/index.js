@@ -49,6 +49,7 @@ const Message = require('./models/Message');
 const Event = require('./models/Event');
 const User = require('./models/User');
 const Attendee = require('./models/Attendee');
+const { assertAttendeeCheckedIn } = require('./utils/chatAuth');
 
 io.on('connection', (socket) => {
   console.log('User connected to base socket:', socket.id);
@@ -73,6 +74,20 @@ io.on('connection', (socket) => {
     if (mongoose.Types.ObjectId.isValid(roomId)) {
       try {
         const roomDoc = await Room.findById(roomId);
+
+        // Check-in gate for attendee sockets
+        if (roomDoc && socket.attendee) {
+          const { allowed, reason } = await assertAttendeeCheckedIn(
+            socket.attendee.id,
+            roomDoc.event.toString()
+          );
+          if (!allowed) {
+            console.warn(`[Socket] Blocked un-checked-in attendee ${socket.attendee.id} from joining room ${roomId}`);
+            socket.emit('chat_access_denied', { message: reason });
+            return;
+          }
+        }
+
         if (roomDoc && (roomDoc.isGroup === false || roomDoc.type === 'private')) {
           const socketId = socket.user?.id || socket.attendee?.id;
           const isParticipant = socketId && roomDoc.participantIds && roomDoc.participantIds.includes(String(socketId));
@@ -155,6 +170,28 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Admin projector confirms the question is rendered on screen.
+  // Only then do we emit question_display to unlock attendee answer buttons.
+  socket.on('admin_question_ready', (data) => {
+    const rawPin = data?.pin;
+    const pin = rawPin ? rawPin.toString().replace(/\s+/g, '').trim() : null;
+    if (!pin) return;
+    const room = `quiz_${pin}`;
+    const payload = {
+      pin,
+      questionIndex: data?.questionIndex ?? 0,
+      totalQuestions: data?.totalQuestions,
+      currentQuestion: data?.currentQuestion ?? null,
+      question: data?.question ?? null,
+      options: data?.options ?? [],
+      timeLimitSeconds: data?.timeLimitSeconds ?? 20,
+      startedAt: data?.startedAt ?? Date.now(),
+    };
+    console.log(`[Socket] Admin question ready for PIN ${pin} Q${payload.questionIndex} — emitting question_display to ${room}`);
+    io.to(room).emit('question_display', payload);
+    io.to(pin).emit('question_display', payload);
+  });
+
   socket.on('send_message', async (data) => {
     const { room, sender, content, type } = data;
     try {
@@ -165,6 +202,19 @@ io.on('connection', (socket) => {
         roomDoc = await Room.findById(room);
         if (roomDoc) {
           isDirect = (roomDoc.isGroup === false || roomDoc.type === 'private');
+        }
+      }
+
+      // Check-in gate for attendee sockets
+      if (roomDoc && socket.attendee) {
+        const { allowed, reason } = await assertAttendeeCheckedIn(
+          socket.attendee.id,
+          roomDoc.event.toString()
+        );
+        if (!allowed) {
+          console.warn(`[Socket] Blocked un-checked-in attendee ${socket.attendee.id} from sending message in room ${room}`);
+          socket.emit('chat_access_denied', { message: reason });
+          return;
         }
       }
 
