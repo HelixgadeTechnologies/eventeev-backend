@@ -830,6 +830,8 @@ const advanceSessionQuestion = async (cleanPin) => {
         question: nextQ,
         timeLimitSeconds: nextQ?.timeLimitSeconds || 20,
         options: nextQ?.options || [],
+        introSeconds: 3,
+        startedAt: Date.now(),
       };
 
       try {
@@ -892,8 +894,12 @@ const advanceSessionQuestion = async (cleanPin) => {
 
 function scheduleSessionQuestionTimer(pin, questionIndex, durationSeconds) {
   clearSessionTimer(pin);
-  const duration = (durationSeconds || 20) + 1;
-  console.log(`[AutoAdvance] Scheduling question ${questionIndex} timeout (${duration}s) for PIN ${pin}`);
+  // Account for admin countdown synchronization:
+  // Question 0 has 5s initial countdown + 3s intro teaser = 8s
+  // Subsequent questions (Q > 0) have 3s intro teaser
+  const syncDelay = questionIndex === 0 ? 8 : 3;
+  const duration = (durationSeconds || 20) + syncDelay + 1;
+  console.log(`[AutoAdvance] Scheduling question ${questionIndex} timeout (${duration}s total, including ${syncDelay}s countdown/intro delay) for PIN ${pin}`);
   const timer = setTimeout(async () => {
     try {
       const session = await QuizSession.findOne({ pin });
@@ -951,6 +957,9 @@ exports.startSession = async (req, res) => {
       question: currentQ,
       timeLimitSeconds: currentQ?.timeLimitSeconds || 20,
       options: currentQ?.options || [],
+      countdownSeconds: 5,
+      introSeconds: 3,
+      startedAt: Date.now(),
     };
 
     // Broadcast to real-time Socket.IO room
