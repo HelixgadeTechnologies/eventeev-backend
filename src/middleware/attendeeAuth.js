@@ -20,10 +20,13 @@ module.exports = function(req, res, next) {
   // Verify token
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded.attendee) {
+    if (decoded.attendee) {
+      req.attendee = decoded.attendee;
+    } else if (decoded.id) {
+      req.attendee = { id: decoded.id, email: decoded.email, name: decoded.name };
+    } else {
       return res.status(401).json({ message: 'Token is not a valid attendee token' });
     }
-    req.attendee = decoded.attendee;
     next();
   } catch (err) {
     res.status(401).json({ message: 'Token is not valid' });

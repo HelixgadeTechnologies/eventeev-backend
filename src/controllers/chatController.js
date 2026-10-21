@@ -61,14 +61,24 @@ exports.getParticipants = async (req, res) => {
     const requesterId = req.user ? req.user.id : req.attendee?.id;
     const isOwner = Boolean(req.user && event.owner && event.owner._id.toString() === req.user.id);
 
-    // If requester is not the event owner, verify they are a registered attendee of this event
-    if (!isOwner) {
-      if (!req.attendee || !req.attendee.id) {
-        return res.status(403).json({ message: 'Access denied: Must be registered attendee or organizer' });
-      }
-      const isReg = await Attendee.findOne({ _id: req.attendee.id, eventId });
-      if (!isReg) {
-        return res.status(403).json({ message: 'Access denied: You are not registered for this event' });
+    // If requester is not the event owner, verify registration (by _id or email)
+    if (!isOwner && req.attendee) {
+      let isReg = null;
+      if (mongoose.Types.ObjectId.isValid(req.attendee.id)) {
+        isReg = await Attendee.findOne({
+          $or: [
+            { _id: req.attendee.id, eventId },
+            ...(req.attendee.email ? [{ email: req.attendee.email, eventId }] : []),
+            { _id: req.attendee.id }
+          ]
+        });
+      } else if (req.attendee.email) {
+        isReg = await Attendee.findOne({
+          $or: [
+            { email: req.attendee.email, eventId },
+            { email: req.attendee.email }
+          ]
+        });
       }
     }
 
@@ -82,11 +92,15 @@ exports.getParticipants = async (req, res) => {
       isCurrentUser: String(event.owner._id) === String(requesterId),
     } : null;
 
-    // 2. Verified attendees (exclude cancelled)
+    // 2. Verified attendees (exclude cancelled, support ObjectId & string eventId)
+    const eventQuery = mongoose.Types.ObjectId.isValid(eventId)
+      ? { $in: [eventId, new mongoose.Types.ObjectId(eventId)] }
+      : eventId;
+
     const attendeesList = await Attendee.find({
-      eventId,
+      eventId: eventQuery,
       status: { $ne: 'cancelled' }
-    }).select('name status createdAt');
+    }).select('name email avatar status createdAt');
 
     const attendees = attendeesList.map(att => ({
       id: String(att._id),

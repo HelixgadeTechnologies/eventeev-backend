@@ -24,6 +24,8 @@ module.exports = function(req, res, next) {
       req.user = decoded.user;
     } else if (decoded.attendee) {
       req.attendee = decoded.attendee;
+    } else if (decoded.id) {
+      req.attendee = { id: decoded.id, email: decoded.email, name: decoded.name };
     } else {
       return res.status(401).json({ message: 'Token is not valid for this resource' });
     }
