@@ -718,6 +718,22 @@ function clearSessionTimer(pin) {
 }
 
 /**
+ * Robust broadcaster to both "quiz_{pin}" and "{pin}" rooms
+ */
+function broadcastToQuiz(cleanPin, event, payload) {
+  try {
+    const { getIO } = require("../utils/socket");
+    const io = getIO();
+    const rooms = [`quiz_${cleanPin}`, cleanPin];
+    rooms.forEach((r) => {
+      io.to(r).emit(event, payload);
+    });
+  } catch (socketErr) {
+    // Socket not ready or outside web context
+  }
+}
+
+/**
  * Core function to reveal answer and broadcast round results
  */
 const triggerRevealAnswer = async (cleanPin) => {
@@ -769,16 +785,21 @@ const triggerRevealAnswer = async (cleanPin) => {
       leaderboard: sortedParticipants.slice(0, 10),
     };
 
-    try {
-      const { getIO } = require('../utils/socket');
-      const io = getIO();
-      io.to(`quiz_${cleanPin}`).emit('question_ended', payload);
-      io.to(`quiz_${cleanPin}`).emit('round_ended', payload);
-      io.to(`quiz_${cleanPin}`).emit('round_result', payload);
-      io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
-    } catch (socketErr) {}
+    const revealEvents = [
+      'question_ended',
+      'round_ended',
+      'round_result',
+      'reveal_answer',
+      'answer_revealed',
+      'show_results',
+      'question_end',
+      'time_up',
+      'game_state_changed',
+    ];
+    revealEvents.forEach((ev) => broadcastToQuiz(cleanPin, ev, payload));
 
-    // Auto-advance to next question or game over after 4 seconds of round reveal
+    // Fallback auto-advance: 18s gives admin host full time (4s results + 5.1s leaderboard)
+    // to view standings and click "Next Question" without being rushed ahead.
     clearSessionTimer(cleanPin);
     const advanceTimer = setTimeout(async () => {
       try {
@@ -786,7 +807,7 @@ const triggerRevealAnswer = async (cleanPin) => {
       } catch (err) {
         console.error('[AutoAdvance] Error advancing after reveal:', err.message);
       }
-    }, 4000);
+    }, 18000);
     activeSessionTimers.set(cleanPin, advanceTimer);
 
     return payload;
@@ -834,15 +855,14 @@ const advanceSessionQuestion = async (cleanPin) => {
         startedAt: Date.now(),
       };
 
-      try {
-        const { getIO } = require('../utils/socket');
-        const io = getIO();
-        io.to(`quiz_${cleanPin}`).emit('next_question', payload);
-        io.to(`quiz_${cleanPin}`).emit('new_question', payload);
-        io.to(`quiz_${cleanPin}`).emit('question_start', payload);
-        io.to(`quiz_${cleanPin}`).emit('question_started', payload);
-        io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
-      } catch (socketErr) {}
+      const nextQEvents = [
+        'next_question',
+        'new_question',
+        'question_start',
+        'question_started',
+        'game_state_changed',
+      ];
+      nextQEvents.forEach((ev) => broadcastToQuiz(cleanPin, ev, payload));
 
       // Schedule question timer auto-advance
       scheduleSessionQuestionTimer(cleanPin, nextIndex, nextQ?.timeLimitSeconds || 20);
@@ -875,13 +895,13 @@ const advanceSessionQuestion = async (cleanPin) => {
         leaderboard: sortedParticipants,
       };
 
-      try {
-        const { getIO } = require('../utils/socket');
-        const io = getIO();
-        io.to(`quiz_${cleanPin}`).emit('game_over', gameOverPayload);
-        io.to(`quiz_${cleanPin}`).emit('quiz_ended', gameOverPayload);
-        io.to(`quiz_${cleanPin}`).emit('game_state_changed', gameOverPayload);
-      } catch (socketErr) {}
+      const gameOverEvents = [
+        'game_over',
+        'quiz_ended',
+        'game_ended',
+        'game_state_changed',
+      ];
+      gameOverEvents.forEach((ev) => broadcastToQuiz(cleanPin, ev, gameOverPayload));
 
       clearSessionTimer(cleanPin);
       return gameOverPayload;
@@ -963,17 +983,16 @@ exports.startSession = async (req, res) => {
     };
 
     // Broadcast to real-time Socket.IO room
-    try {
-      const { getIO } = require('../utils/socket');
-      const io = getIO();
-      io.to(`quiz_${cleanPin}`).emit('game_started', payload);
-      io.to(`quiz_${cleanPin}`).emit('quiz_started', payload);
-      io.to(`quiz_${cleanPin}`).emit('question_start', payload);
-      io.to(`quiz_${cleanPin}`).emit('question_started', payload);
-      io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
-    } catch (socketErr) {
-      console.warn('Socket broadcast skipped:', socketErr.message);
-    }
+    const startEvents = [
+      'game_started',
+      'quiz_started',
+      'start_quiz',
+      'admin_start',
+      'question_start',
+      'question_started',
+      'game_state_changed',
+    ];
+    startEvents.forEach((ev) => broadcastToQuiz(cleanPin, ev, payload));
 
     // Automatically schedule timer for Question 0
     scheduleSessionQuestionTimer(cleanPin, 0, currentQ?.timeLimitSeconds || 20);
@@ -996,6 +1015,7 @@ exports.startSession = async (req, res) => {
 exports.nextQuestion = async (req, res) => {
   const { pin } = req.params;
   const cleanPin = pin.toString().replace(/\s+/g, '').trim();
+  clearSessionTimer(cleanPin);
 
   try {
     const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
@@ -1038,15 +1058,14 @@ exports.nextQuestion = async (req, res) => {
         options: nextQ?.options || [],
       };
 
-      try {
-        const { getIO } = require('../utils/socket');
-        const io = getIO();
-        io.to(`quiz_${cleanPin}`).emit('next_question', payload);
-        io.to(`quiz_${cleanPin}`).emit('new_question', payload);
-        io.to(`quiz_${cleanPin}`).emit('question_start', payload);
-        io.to(`quiz_${cleanPin}`).emit('question_started', payload);
-        io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
-      } catch (socketErr) {}
+      const nextQEvents = [
+        'next_question',
+        'new_question',
+        'question_start',
+        'question_started',
+        'game_state_changed',
+      ];
+      nextQEvents.forEach((ev) => broadcastToQuiz(cleanPin, ev, payload));
 
       scheduleSessionQuestionTimer(cleanPin, nextIndex, nextQ?.timeLimitSeconds || 20);
 
@@ -1080,13 +1099,13 @@ exports.nextQuestion = async (req, res) => {
         leaderboard: sortedParticipants,
       };
 
-      try {
-        const { getIO } = require('../utils/socket');
-        const io = getIO();
-        io.to(`quiz_${cleanPin}`).emit('game_over', gameOverPayload);
-        io.to(`quiz_${cleanPin}`).emit('quiz_ended', gameOverPayload);
-        io.to(`quiz_${cleanPin}`).emit('game_state_changed', gameOverPayload);
-      } catch (socketErr) {}
+      const gameOverEvents = [
+        'game_over',
+        'quiz_ended',
+        'game_ended',
+        'game_state_changed',
+      ];
+      gameOverEvents.forEach((ev) => broadcastToQuiz(cleanPin, ev, gameOverPayload));
 
       clearSessionTimer(cleanPin);
 
