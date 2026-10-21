@@ -592,6 +592,32 @@ exports.submitAnswer = async (req, res) => {
       // Socket instance might not be initialized in non-server contexts (e.g. unit tests)
     }
 
+    // Sort participants to get rank
+    const sortedParticipants = session.participants.sort((a, b) => (b.score || 0) - (a.score || 0));
+    const playerRank = sortedParticipants.findIndex(p => (
+      (p.nickname && participant.nickname && p.nickname.toLowerCase() === participant.nickname.toLowerCase()) ||
+      (p._id && participant._id && p._id.toString() === participant._id.toString())
+    )) + 1;
+
+    // Check if all active participants have submitted answers for this question
+    const allAnswered =
+      session.participants.length > 0 &&
+      session.participants.every(p =>
+        p.answers && p.answers.some(a => a.questionIndex === Number(questionIndex))
+      );
+
+    if (allAnswered) {
+      console.log(`[AutoAdvance] All participants answered Question ${questionIndex} for PIN ${pin}. Revealing in 1.2s...`);
+      clearSessionTimer(pin);
+      setTimeout(async () => {
+        try {
+          await triggerRevealAnswer(pin);
+        } catch (e) {
+          console.error('[AutoAdvance] Early reveal error:', e.message);
+        }
+      }, 1200);
+    }
+
     res.json({
       isCorrect,
       points: totalPoints,
@@ -599,6 +625,9 @@ exports.submitAnswer = async (req, res) => {
       streakBonus,
       streak: participant.streak,
       currentScore: participant.score,
+      correctOptionIndex: correctAnswers.length > 0 ? correctAnswers[0] : 0,
+      rank: playerRank > 0 ? playerRank : 1,
+      totalParticipants: session.participants.length
     });
   } catch (error) {
     console.error('Error submitting quiz answer:', error);
@@ -677,6 +706,209 @@ exports.getSession = async (req, res) => {
  * @route   POST /api/game/quiz/session/:pin/start
  * @access  Private
  */
+
+// Track active question timers per quiz session pin
+const activeSessionTimers = new Map();
+
+function clearSessionTimer(pin) {
+  if (activeSessionTimers.has(pin)) {
+    clearTimeout(activeSessionTimers.get(pin));
+    activeSessionTimers.delete(pin);
+  }
+}
+
+/**
+ * Core function to reveal answer and broadcast round results
+ */
+const triggerRevealAnswer = async (cleanPin) => {
+  try {
+    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    if (!session || session.status === 'finished') return null;
+
+    const quiz = session.quizId;
+    const qIndex = session.currentQuestionIndex || 0;
+    const question = quiz?.questions?.[qIndex];
+    if (!question) return null;
+
+    const correctAnswers = (question.correctAnswer || []).map(Number);
+    const correctOptionIndex = correctAnswers.length > 0 ? correctAnswers[0] : 0;
+
+    // Compile answer distribution
+    const distribution = (question.options || []).map((_, idx) => {
+      let count = 0;
+      session.participants.forEach(p => {
+        const ans = p.answers?.find(a => a.questionIndex === qIndex);
+        if (ans && ans.answer && ans.answer.includes(idx)) {
+          count++;
+        }
+      });
+      return count;
+    });
+
+    const sortedParticipants = session.participants
+      .map(p => ({
+        userId: p.userId,
+        nickname: p.nickname,
+        score: p.score || 0,
+        streak: p.streak || 0,
+        lastAnswerCorrect: p.lastAnswerCorrect || false,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const payload = {
+      pin: cleanPin,
+      sessionId: session._id,
+      status: 'reveal',
+      gameState: 'round_reveal',
+      state: 'reveal',
+      questionIndex: qIndex,
+      correctOptionIndex,
+      correctAnswer: correctOptionIndex,
+      correctAnswers,
+      distribution,
+      leaderboard: sortedParticipants.slice(0, 10),
+    };
+
+    try {
+      const { getIO } = require('../utils/socket');
+      const io = getIO();
+      io.to(`quiz_${cleanPin}`).emit('question_ended', payload);
+      io.to(`quiz_${cleanPin}`).emit('round_ended', payload);
+      io.to(`quiz_${cleanPin}`).emit('round_result', payload);
+      io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
+    } catch (socketErr) {}
+
+    // Auto-advance to next question or game over after 4 seconds of round reveal
+    clearSessionTimer(cleanPin);
+    const advanceTimer = setTimeout(async () => {
+      try {
+        await advanceSessionQuestion(cleanPin);
+      } catch (err) {
+        console.error('[AutoAdvance] Error advancing after reveal:', err.message);
+      }
+    }, 4000);
+    activeSessionTimers.set(cleanPin, advanceTimer);
+
+    return payload;
+  } catch (err) {
+    console.error('[triggerRevealAnswer] Error:', err.message);
+    return null;
+  }
+};
+
+/**
+ * Core function to advance to next question or complete game
+ */
+const advanceSessionQuestion = async (cleanPin) => {
+  try {
+    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    if (!session || session.status === 'finished') return null;
+
+    const quiz = session.quizId;
+    if (!quiz) return null;
+
+    const totalQuestions = quiz.questions?.length || 0;
+    const nextIndex = (session.currentQuestionIndex || 0) + 1;
+
+    if (nextIndex < totalQuestions) {
+      session.currentQuestionIndex = nextIndex;
+      session.status = 'active';
+      await session.save();
+
+      const nextQ = formatSanitizedQuestion(quiz.questions[nextIndex], nextIndex, totalQuestions);
+
+      const payload = {
+        pin: cleanPin,
+        sessionId: session._id,
+        status: 'active',
+        gameState: 'active',
+        state: 'active',
+        currentQuestionIndex: nextIndex,
+        questionIndex: nextIndex,
+        totalQuestions,
+        currentQuestion: nextQ,
+        question: nextQ,
+        timeLimitSeconds: nextQ?.timeLimitSeconds || 20,
+        options: nextQ?.options || [],
+      };
+
+      try {
+        const { getIO } = require('../utils/socket');
+        const io = getIO();
+        io.to(`quiz_${cleanPin}`).emit('next_question', payload);
+        io.to(`quiz_${cleanPin}`).emit('new_question', payload);
+        io.to(`quiz_${cleanPin}`).emit('question_start', payload);
+        io.to(`quiz_${cleanPin}`).emit('question_started', payload);
+        io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
+      } catch (socketErr) {}
+
+      // Schedule question timer auto-advance
+      scheduleSessionQuestionTimer(cleanPin, nextIndex, nextQ?.timeLimitSeconds || 20);
+
+      return payload;
+    } else {
+      // All questions completed -> Game Over & Final Podium!
+      session.status = 'finished';
+      await session.save();
+
+      const sortedParticipants = session.participants
+        .map((p, idx) => ({
+          userId: p.userId,
+          name: p.nickname || `Player ${idx + 1}`,
+          nickname: p.nickname || `Player ${idx + 1}`,
+          score: p.score || 0,
+          streak: p.streak || 0,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((p, idx) => ({ ...p, rank: idx + 1 }));
+
+      const gameOverPayload = {
+        pin: cleanPin,
+        sessionId: session._id,
+        status: 'finished',
+        gameState: 'game_over',
+        state: 'ended',
+        totalParticipants: session.participants.length,
+        topLeaderboard: sortedParticipants.slice(0, 10),
+        leaderboard: sortedParticipants,
+      };
+
+      try {
+        const { getIO } = require('../utils/socket');
+        const io = getIO();
+        io.to(`quiz_${cleanPin}`).emit('game_over', gameOverPayload);
+        io.to(`quiz_${cleanPin}`).emit('quiz_ended', gameOverPayload);
+        io.to(`quiz_${cleanPin}`).emit('game_state_changed', gameOverPayload);
+      } catch (socketErr) {}
+
+      clearSessionTimer(cleanPin);
+      return gameOverPayload;
+    }
+  } catch (err) {
+    console.error('[advanceSessionQuestion] Error:', err.message);
+    return null;
+  }
+};
+
+function scheduleSessionQuestionTimer(pin, questionIndex, durationSeconds) {
+  clearSessionTimer(pin);
+  const duration = (durationSeconds || 20) + 1;
+  console.log(`[AutoAdvance] Scheduling question ${questionIndex} timeout (${duration}s) for PIN ${pin}`);
+  const timer = setTimeout(async () => {
+    try {
+      const session = await QuizSession.findOne({ pin });
+      if (session && session.status === 'active' && session.currentQuestionIndex === questionIndex) {
+        console.log(`[AutoAdvance] Question ${questionIndex} timer expired for PIN ${pin}. Auto-revealing answer...`);
+        await triggerRevealAnswer(pin);
+      }
+    } catch (err) {
+      console.error(`[AutoAdvance] Timer error for PIN ${pin}:`, err.message);
+    }
+  }, duration * 1000);
+
+  activeSessionTimers.set(pin, timer);
+}
+
 exports.startSession = async (req, res) => {
   const { pin } = req.params;
   const cleanPin = pin.toString().replace(/\s+/g, '').trim();
@@ -733,6 +965,9 @@ exports.startSession = async (req, res) => {
     } catch (socketErr) {
       console.warn('Socket broadcast skipped:', socketErr.message);
     }
+
+    // Automatically schedule timer for Question 0
+    scheduleSessionQuestionTimer(cleanPin, 0, currentQ?.timeLimitSeconds || 20);
 
     res.json({
       message: 'Game session started successfully',
@@ -804,6 +1039,8 @@ exports.nextQuestion = async (req, res) => {
         io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
       } catch (socketErr) {}
 
+      scheduleSessionQuestionTimer(cleanPin, nextIndex, nextQ?.timeLimitSeconds || 20);
+
       return res.json({
         message: 'Advanced to next question',
         ...payload
@@ -842,6 +1079,8 @@ exports.nextQuestion = async (req, res) => {
         io.to(`quiz_${cleanPin}`).emit('game_state_changed', gameOverPayload);
       } catch (socketErr) {}
 
+      clearSessionTimer(cleanPin);
+
       return res.json({
         message: 'Quiz completed',
         ...gameOverPayload
@@ -863,65 +1102,20 @@ exports.revealAnswer = async (req, res) => {
   const cleanPin = pin.toString().replace(/\s+/g, '').trim();
 
   try {
-    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    const session = await QuizSession.findOne({ pin: cleanPin });
     if (!session) {
       return res.status(404).json({ message: 'Game session not found' });
     }
 
-    const quiz = session.quizId;
-    const qIndex = session.currentQuestionIndex || 0;
-    const question = quiz?.questions?.[qIndex];
-    if (!question) {
-      return res.status(400).json({ message: 'Current question not found' });
+    const authorized = await verifyHostAuth(session, req.user, req.attendee);
+    if (!authorized) {
+      return res.status(403).json({ message: 'User not authorized to reveal this game' });
     }
 
-    const correctAnswers = (question.correctAnswer || []).map(Number);
-    const correctOptionIndex = correctAnswers.length > 0 ? correctAnswers[0] : 0;
-
-    // Compile answer distribution
-    const distribution = (question.options || []).map((_, idx) => {
-      let count = 0;
-      session.participants.forEach(p => {
-        const ans = p.answers?.find(a => a.questionIndex === qIndex);
-        if (ans && ans.answer && ans.answer.includes(idx)) {
-          count++;
-        }
-      });
-      return count;
-    });
-
-    const sortedParticipants = session.participants
-      .map(p => ({
-        userId: p.userId,
-        nickname: p.nickname,
-        score: p.score || 0,
-        streak: p.streak || 0,
-        lastAnswerCorrect: p.lastAnswerCorrect || false,
-      }))
-      .sort((a, b) => b.score - a.score);
-
-    const payload = {
-      pin: cleanPin,
-      sessionId: session._id,
-      status: 'reveal',
-      gameState: 'round_reveal',
-      state: 'reveal',
-      questionIndex: qIndex,
-      correctOptionIndex,
-      correctAnswer: correctOptionIndex,
-      correctAnswers,
-      distribution,
-      leaderboard: sortedParticipants.slice(0, 10),
-    };
-
-    try {
-      const { getIO } = require('../utils/socket');
-      const io = getIO();
-      io.to(`quiz_${cleanPin}`).emit('question_ended', payload);
-      io.to(`quiz_${cleanPin}`).emit('round_ended', payload);
-      io.to(`quiz_${cleanPin}`).emit('round_result', payload);
-      io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
-    } catch (socketErr) {}
+    const payload = await triggerRevealAnswer(cleanPin);
+    if (!payload) {
+      return res.status(400).json({ message: 'Current question could not be revealed' });
+    }
 
     res.json(payload);
   } catch (error) {
