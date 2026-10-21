@@ -115,6 +115,32 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Quiz real-time session socket handlers
+  socket.on('join_quiz_session', (data) => {
+    const rawPin = data?.pin || data?.sessionId;
+    const pin = rawPin ? rawPin.toString().replace(/\s+/g, '').trim() : null;
+    if (!pin) return;
+    const room = `quiz_${pin}`;
+    socket.join(room);
+    console.log(`[Socket] Socket ${socket.id} (${data?.nickname || 'Guest'}) joined quiz room ${room}`);
+
+    const roomInfo = io.sockets.adapter.rooms.get(room);
+    const count = roomInfo ? roomInfo.size : 1;
+    io.to(room).emit('quiz_room_status', {
+      pin,
+      activeSockets: count,
+    });
+  });
+
+  socket.on('leave_quiz_session', (data) => {
+    const rawPin = data?.pin || data?.sessionId;
+    const pin = rawPin ? rawPin.toString().replace(/\s+/g, '').trim() : null;
+    if (!pin) return;
+    const room = `quiz_${pin}`;
+    socket.leave(room);
+    console.log(`[Socket] Socket ${socket.id} left quiz room ${room}`);
+  });
+
   socket.on('send_message', async (data) => {
     const { room, sender, content, type } = data;
     try {

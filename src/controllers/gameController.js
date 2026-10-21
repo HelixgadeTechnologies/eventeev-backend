@@ -294,6 +294,57 @@ exports.hostQuiz = async (req, res) => {
 };
 
 /**
+ * Helper to sanitize question data for attendees (strips correctAnswer to prevent cheating).
+ */
+const formatSanitizedQuestion = (question, questionIndex, totalQuestions) => {
+  if (!question) return null;
+  return {
+    questionIndex,
+    totalQuestions,
+    text: question.text,
+    question: question.text,
+    options: question.options || [],
+    type: question.type || 'Quiz',
+    timeLimit: question.timeLimit || 20,
+    timeLimitSeconds: question.timeLimit || 20,
+    points: question.points || 1000,
+    mediaUrl: question.mediaUrl || null,
+    imageUrl: question.mediaUrl || null,
+    isMultiSelect: Boolean(question.isMultiSelect),
+  };
+};
+
+/**
+ * Helper to verify host or event owner authorization
+ */
+const verifyHostAuth = async (session, user, attendee) => {
+  if (!session) return false;
+  const currentUserId = user?.id || user?._id || attendee?.id || attendee?._id;
+  if (!currentUserId) return false;
+
+  // 1. Is user the hostId recorded on the session?
+  if (session.hostId && session.hostId.toString() === currentUserId.toString()) {
+    return true;
+  }
+
+  // 2. Is user the creator of the quiz?
+  const quiz = session.quizId;
+  if (quiz && quiz.createdBy && quiz.createdBy.toString() === currentUserId.toString()) {
+    return true;
+  }
+
+  // 3. Is user the owner of the event that owns this quiz?
+  if (quiz && quiz.eventId) {
+    const event = await Event.findById(quiz.eventId);
+    if (event && event.owner && event.owner.toString() === currentUserId.toString()) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
  * @desc    Join a quiz session
  * @route   POST /api/game/quiz/session/join
  * @access  Public
@@ -310,9 +361,13 @@ exports.joinSession = async (req, res) => {
   const cleanPin = pin.toString().replace(/\s+/g, "").trim();
 
   try {
-    const session = await QuizSession.findOne({ pin: cleanPin, status: "waiting" }).populate("quizId");
+    const session = await QuizSession.findOne({
+      pin: cleanPin,
+      status: { $in: ["waiting", "active"] },
+    }).populate("quizId");
+
     if (!session) {
-      return res.status(404).json({ message: "Game session not found or already in progress" });
+      return res.status(404).json({ message: "Game session not found or already completed" });
     }
 
     const trimmedNick = nickname.trim();
@@ -331,12 +386,48 @@ exports.joinSession = async (req, res) => {
       await session.save();
     }
 
-    res.json(session);
+    // Broadcast new player joined to host waiting room screen
+    try {
+      const { getIO } = require('../utils/socket');
+      const io = getIO();
+      io.to(`quiz_${cleanPin}`).emit('player_joined', {
+        pin: cleanPin,
+        player: {
+          nickname: trimmedNick,
+          userId: userId || undefined,
+          score: 0,
+          streak: 0,
+        },
+        totalPlayers: session.participants.length,
+        players: session.participants.map(p => ({
+          userId: p.userId,
+          nickname: p.nickname,
+          score: p.score
+        }))
+      });
+    } catch (_) {}
+
+    // Include current question if session is already active (for late joiners or reconnects)
+    const quiz = session.quizId;
+    const totalQuestions = quiz?.questions?.length || 0;
+    const qIndex = session.currentQuestionIndex || 0;
+    let currentQuestion = null;
+    if (session.status === 'active' && quiz?.questions && quiz.questions[qIndex]) {
+      currentQuestion = formatSanitizedQuestion(quiz.questions[qIndex], qIndex, totalQuestions);
+    }
+
+    res.json({
+      ...session.toObject(),
+      totalQuestions,
+      currentQuestion,
+      question: currentQuestion
+    });
   } catch (error) {
     console.error("Error joining session:", error);
     res.status(500).json({ message: error.message || "Server Error" });
   }
 };
+
 
 /**
  * Calculate Kahoot-style points based on accuracy, response time, and streak.
@@ -533,6 +624,371 @@ exports.getLeaderboard = async (req, res) => {
     res.status(500).send('Server Error');
   }
 };
+
+/**
+ * @desc    Get session status and current question (Public for attendees & hosts)
+ * @route   GET /api/game/quiz/session/:pin
+ * @access  Public
+ */
+exports.getSession = async (req, res) => {
+  const { pin } = req.params;
+  if (!pin) {
+    return res.status(400).json({ message: 'A 6-digit Game PIN is required' });
+  }
+
+  const cleanPin = pin.toString().replace(/\s+/g, '').trim();
+
+  try {
+    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    if (!session) {
+      return res.status(404).json({ message: 'Game session not found' });
+    }
+
+    const quiz = session.quizId;
+    const totalQuestions = quiz?.questions?.length || 0;
+    const qIndex = session.currentQuestionIndex || 0;
+
+    let currentQuestion = null;
+    if (session.status === 'active' && quiz?.questions && quiz.questions[qIndex]) {
+      currentQuestion = formatSanitizedQuestion(quiz.questions[qIndex], qIndex, totalQuestions);
+    }
+
+    res.json({
+      _id: session._id,
+      id: session._id,
+      quizId: session.quizId?._id || session.quizId,
+      pin: session.pin,
+      status: session.status,
+      currentQuestionIndex: qIndex,
+      totalQuestions,
+      currentQuestion,
+      question: currentQuestion,
+      participantsCount: session.participants?.length || 0,
+      quizTitle: quiz?.title || 'Quiz Game',
+    });
+  } catch (error) {
+    console.error('Error fetching session:', error);
+    res.status(500).json({ message: error.message || 'Server Error' });
+  }
+};
+
+/**
+ * @desc    Start a quiz session (Admin / Host initiates question 1)
+ * @route   POST /api/game/quiz/session/:pin/start
+ * @access  Private
+ */
+exports.startSession = async (req, res) => {
+  const { pin } = req.params;
+  const cleanPin = pin.toString().replace(/\s+/g, '').trim();
+
+  try {
+    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    if (!session) {
+      return res.status(404).json({ message: 'Game session not found' });
+    }
+
+    const quiz = session.quizId;
+    if (!quiz) {
+      return res.status(404).json({ message: 'Associated quiz not found' });
+    }
+
+    const authorized = await verifyHostAuth(session, req.user, req.attendee);
+    if (!authorized) {
+      return res.status(403).json({ message: 'User not authorized to start this game' });
+    }
+
+    session.status = 'active';
+    session.currentQuestionIndex = 0;
+    await session.save();
+
+    const totalQuestions = quiz.questions?.length || 0;
+    const currentQ = quiz.questions?.[0]
+      ? formatSanitizedQuestion(quiz.questions[0], 0, totalQuestions)
+      : null;
+
+    const payload = {
+      pin: cleanPin,
+      sessionId: session._id,
+      status: 'active',
+      gameState: 'active',
+      state: 'active',
+      currentQuestionIndex: 0,
+      questionIndex: 0,
+      totalQuestions,
+      currentQuestion: currentQ,
+      question: currentQ,
+      timeLimitSeconds: currentQ?.timeLimitSeconds || 20,
+      options: currentQ?.options || [],
+    };
+
+    // Broadcast to real-time Socket.IO room
+    try {
+      const { getIO } = require('../utils/socket');
+      const io = getIO();
+      io.to(`quiz_${cleanPin}`).emit('game_started', payload);
+      io.to(`quiz_${cleanPin}`).emit('quiz_started', payload);
+      io.to(`quiz_${cleanPin}`).emit('question_start', payload);
+      io.to(`quiz_${cleanPin}`).emit('question_started', payload);
+      io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
+    } catch (socketErr) {
+      console.warn('Socket broadcast skipped:', socketErr.message);
+    }
+
+    res.json({
+      message: 'Game session started successfully',
+      ...payload
+    });
+  } catch (error) {
+    console.error('Error starting game session:', error);
+    res.status(500).json({ message: error.message || 'Server Error' });
+  }
+};
+
+/**
+ * @desc    Advance to the next question or complete game
+ * @route   POST /api/game/quiz/session/:pin/next
+ * @access  Private
+ */
+exports.nextQuestion = async (req, res) => {
+  const { pin } = req.params;
+  const cleanPin = pin.toString().replace(/\s+/g, '').trim();
+
+  try {
+    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    if (!session) {
+      return res.status(404).json({ message: 'Game session not found' });
+    }
+
+    const quiz = session.quizId;
+    if (!quiz) {
+      return res.status(404).json({ message: 'Associated quiz not found' });
+    }
+
+    const authorized = await verifyHostAuth(session, req.user, req.attendee);
+    if (!authorized) {
+      return res.status(403).json({ message: 'User not authorized to advance this game' });
+    }
+
+    const totalQuestions = quiz.questions?.length || 0;
+    const nextIndex = (session.currentQuestionIndex || 0) + 1;
+
+    if (nextIndex < totalQuestions) {
+      session.currentQuestionIndex = nextIndex;
+      session.status = 'active';
+      await session.save();
+
+      const nextQ = formatSanitizedQuestion(quiz.questions[nextIndex], nextIndex, totalQuestions);
+
+      const payload = {
+        pin: cleanPin,
+        sessionId: session._id,
+        status: 'active',
+        gameState: 'active',
+        state: 'active',
+        currentQuestionIndex: nextIndex,
+        questionIndex: nextIndex,
+        totalQuestions,
+        currentQuestion: nextQ,
+        question: nextQ,
+        timeLimitSeconds: nextQ?.timeLimitSeconds || 20,
+        options: nextQ?.options || [],
+      };
+
+      try {
+        const { getIO } = require('../utils/socket');
+        const io = getIO();
+        io.to(`quiz_${cleanPin}`).emit('next_question', payload);
+        io.to(`quiz_${cleanPin}`).emit('new_question', payload);
+        io.to(`quiz_${cleanPin}`).emit('question_start', payload);
+        io.to(`quiz_${cleanPin}`).emit('question_started', payload);
+        io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
+      } catch (socketErr) {}
+
+      return res.json({
+        message: 'Advanced to next question',
+        ...payload
+      });
+    } else {
+      session.status = 'finished';
+      await session.save();
+
+      const sortedParticipants = session.participants
+        .map((p, idx) => ({
+          userId: p.userId,
+          name: p.nickname || `Player ${idx + 1}`,
+          nickname: p.nickname || `Player ${idx + 1}`,
+          score: p.score || 0,
+          streak: p.streak || 0,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((p, idx) => ({ ...p, rank: idx + 1 }));
+
+      const gameOverPayload = {
+        pin: cleanPin,
+        sessionId: session._id,
+        status: 'finished',
+        gameState: 'game_over',
+        state: 'ended',
+        totalParticipants: session.participants.length,
+        topLeaderboard: sortedParticipants.slice(0, 10),
+        leaderboard: sortedParticipants,
+      };
+
+      try {
+        const { getIO } = require('../utils/socket');
+        const io = getIO();
+        io.to(`quiz_${cleanPin}`).emit('game_over', gameOverPayload);
+        io.to(`quiz_${cleanPin}`).emit('quiz_ended', gameOverPayload);
+        io.to(`quiz_${cleanPin}`).emit('game_state_changed', gameOverPayload);
+      } catch (socketErr) {}
+
+      return res.json({
+        message: 'Quiz completed',
+        ...gameOverPayload
+      });
+    }
+  } catch (error) {
+    console.error('Error advancing quiz question:', error);
+    res.status(500).json({ message: error.message || 'Server Error' });
+  }
+};
+
+/**
+ * @desc    Reveal answer / round results for the current question
+ * @route   POST /api/game/quiz/session/:pin/reveal
+ * @access  Private
+ */
+exports.revealAnswer = async (req, res) => {
+  const { pin } = req.params;
+  const cleanPin = pin.toString().replace(/\s+/g, '').trim();
+
+  try {
+    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    if (!session) {
+      return res.status(404).json({ message: 'Game session not found' });
+    }
+
+    const quiz = session.quizId;
+    const qIndex = session.currentQuestionIndex || 0;
+    const question = quiz?.questions?.[qIndex];
+    if (!question) {
+      return res.status(400).json({ message: 'Current question not found' });
+    }
+
+    const correctAnswers = (question.correctAnswer || []).map(Number);
+    const correctOptionIndex = correctAnswers.length > 0 ? correctAnswers[0] : 0;
+
+    // Compile answer distribution
+    const distribution = (question.options || []).map((_, idx) => {
+      let count = 0;
+      session.participants.forEach(p => {
+        const ans = p.answers?.find(a => a.questionIndex === qIndex);
+        if (ans && ans.answer && ans.answer.includes(idx)) {
+          count++;
+        }
+      });
+      return count;
+    });
+
+    const sortedParticipants = session.participants
+      .map(p => ({
+        userId: p.userId,
+        nickname: p.nickname,
+        score: p.score || 0,
+        streak: p.streak || 0,
+        lastAnswerCorrect: p.lastAnswerCorrect || false,
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const payload = {
+      pin: cleanPin,
+      sessionId: session._id,
+      status: 'reveal',
+      gameState: 'round_reveal',
+      state: 'reveal',
+      questionIndex: qIndex,
+      correctOptionIndex,
+      correctAnswer: correctOptionIndex,
+      correctAnswers,
+      distribution,
+      leaderboard: sortedParticipants.slice(0, 10),
+    };
+
+    try {
+      const { getIO } = require('../utils/socket');
+      const io = getIO();
+      io.to(`quiz_${cleanPin}`).emit('question_ended', payload);
+      io.to(`quiz_${cleanPin}`).emit('round_ended', payload);
+      io.to(`quiz_${cleanPin}`).emit('round_result', payload);
+      io.to(`quiz_${cleanPin}`).emit('game_state_changed', payload);
+    } catch (socketErr) {}
+
+    res.json(payload);
+  } catch (error) {
+    console.error('Error revealing question answer:', error);
+    res.status(500).json({ message: error.message || 'Server Error' });
+  }
+};
+
+/**
+ * @desc    End game manually
+ * @route   POST /api/game/quiz/session/:pin/end
+ * @access  Private
+ */
+exports.endSession = async (req, res) => {
+  const { pin } = req.params;
+  const cleanPin = pin.toString().replace(/\s+/g, '').trim();
+
+  try {
+    const session = await QuizSession.findOne({ pin: cleanPin }).populate('quizId');
+    if (!session) {
+      return res.status(404).json({ message: 'Game session not found' });
+    }
+
+    const authorized = await verifyHostAuth(session, req.user, req.attendee);
+    if (!authorized) {
+      return res.status(403).json({ message: 'User not authorized to end this game' });
+    }
+
+    session.status = 'finished';
+    await session.save();
+
+    const sortedParticipants = session.participants
+      .map((p, idx) => ({
+        userId: p.userId,
+        name: p.nickname || `Player ${idx + 1}`,
+        nickname: p.nickname || `Player ${idx + 1}`,
+        score: p.score || 0,
+        streak: p.streak || 0,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map((p, idx) => ({ ...p, rank: idx + 1 }));
+
+    const gameOverPayload = {
+      pin: cleanPin,
+      sessionId: session._id,
+      status: 'finished',
+      gameState: 'game_over',
+      totalParticipants: session.participants.length,
+      topLeaderboard: sortedParticipants.slice(0, 10),
+      leaderboard: sortedParticipants,
+    };
+
+    try {
+      const { getIO } = require('../utils/socket');
+      const io = getIO();
+      io.to(`quiz_${cleanPin}`).emit('game_over', gameOverPayload);
+      io.to(`quiz_${cleanPin}`).emit('quiz_ended', gameOverPayload);
+      io.to(`quiz_${cleanPin}`).emit('game_state_changed', gameOverPayload);
+    } catch (socketErr) {}
+
+    res.json({ message: 'Game session ended', ...gameOverPayload });
+  } catch (error) {
+    console.error('Error ending quiz session:', error);
+    res.status(500).json({ message: error.message || 'Server Error' });
+  }
+};
+
 
 /**
  * @desc    Get rolling game settings for an event

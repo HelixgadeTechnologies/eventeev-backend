@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const gameController = require('../controllers/gameController');
 const auth = require('../middleware/auth');
+const multiAuth = require('../middleware/multiAuth');
 
 
 /**
@@ -344,4 +345,107 @@ router.patch('/quiz/session/:pin/submit', gameController.submitAnswer);
  */
 router.get('/quiz/session/:pin/leaderboard', gameController.getLeaderboard);
 
+/**
+ * @openapi
+ * /api/game/quiz/session/{pin}:
+ *   get:
+ *     tags: [Games - Quiz]
+ *     summary: Get quiz session status and active question
+ *     parameters:
+ *       - in: path
+ *         name: pin
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       404:
+ *         description: Session not found
+ */
+router.get('/quiz/session/:pin', gameController.getSession);
+
+/**
+ * @openapi
+ * /api/game/quiz/session/{pin}/start:
+ *   post:
+ *     tags: [Games - Quiz]
+ *     summary: Start quiz session (Host / Admin)
+ *     parameters:
+ *       - in: path
+ *         name: pin
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Quiz session started and question 1 broadcasted
+ *       403:
+ *         description: Unauthorized
+ *       404:
+ *         description: Session not found
+ */
+router.post('/quiz/session/:pin/start', multiAuth, gameController.startSession);
+
+/**
+ * @openapi
+ * /api/game/quiz/session/{pin}/next:
+ *   post:
+ *     tags: [Games - Quiz]
+ *     summary: Advance to next question or complete quiz
+ *     parameters:
+ *       - in: path
+ *         name: pin
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Advanced to next question or quiz completed
+ *       403:
+ *         description: Unauthorized
+ */
+router.post('/quiz/session/:pin/next', multiAuth, gameController.nextQuestion);
+
+/**
+ * @openapi
+ * /api/game/quiz/session/{pin}/reveal:
+ *   post:
+ *     tags: [Games - Quiz]
+ *     summary: Reveal answer and round results for current question
+ *     parameters:
+ *       - in: path
+ *         name: pin
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Round results revealed
+ *       403:
+ *         description: Unauthorized
+ */
+router.post('/quiz/session/:pin/reveal', multiAuth, gameController.revealAnswer);
+
+/**
+ * @openapi
+ * /api/game/quiz/session/{pin}/end:
+ *   post:
+ *     tags: [Games - Quiz]
+ *     summary: End quiz session manually
+ *     parameters:
+ *       - in: path
+ *         name: pin
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Quiz session finished
+ *       403:
+ *         description: Unauthorized
+ */
+router.post('/quiz/session/:pin/end', multiAuth, gameController.endSession);
+
 module.exports = router;
+
