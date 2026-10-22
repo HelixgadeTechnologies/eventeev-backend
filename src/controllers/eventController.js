@@ -43,17 +43,20 @@ const getFrontendBaseUrl = () => {
  */
 exports.getPublicEventBySlug = async (req, res) => {
   try {
-    // Try finding by slug first
-    let event = await Event.findOne({ slug: req.params.slug, status: 'Published' });
+    // Try finding by slug first (populating organizer owner details)
+    let event = await Event.findOne({ slug: req.params.slug, status: 'Published' })
+      .populate('owner', 'firstName lastName orgName avatar email');
     
     // Fallback: Try finding by ID if no slug matches (useful for legacy events)
     if (!event && req.params.slug.match(/^[0-9a-fA-F]{24}$/)) {
-      event = await Event.findOne({ _id: req.params.slug, status: 'Published' });
+      event = await Event.findOne({ _id: req.params.slug, status: 'Published' })
+        .populate('owner', 'firstName lastName orgName avatar email');
     }
 
     // Fallback: Try finding by connectCode
     if (!event) {
-      event = await Event.findOne({ connectCode: req.params.slug.toUpperCase(), status: 'Published' });
+      event = await Event.findOne({ connectCode: req.params.slug.toUpperCase(), status: 'Published' })
+        .populate('owner', 'firstName lastName orgName avatar email');
     }
 
     if (!event) {
