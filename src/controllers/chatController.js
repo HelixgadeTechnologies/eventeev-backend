@@ -8,37 +8,54 @@ const { getIO } = require('../utils/socket');
 const { assertAttendeeCheckedIn } = require('../utils/chatAuth');
 
 /**
- * Helper to resolve participant profile info (User or Attendee)
+ * Helper to resolve multiple participant profile info in batch (avoiding N+1 queries)
  */
-async function resolveParticipant(id) {
-  if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+async function resolveParticipantsBatch(ids) {
+  const uniqueIds = Array.from(new Set(ids.map(String).filter(id => id && mongoose.Types.ObjectId.isValid(id))));
+  if (uniqueIds.length === 0) return new Map();
 
-  // Check User collection first (Organizer / Admin)
-  const user = await User.findById(id).select('firstName lastName orgName avatar');
-  if (user) {
+  const objectIds = uniqueIds.map(id => new mongoose.Types.ObjectId(id));
+
+  // Single batch query for Users (Organizers / Admins)
+  const users = await User.find({ _id: { $in: objectIds } }).select('firstName lastName orgName avatar');
+  const participantMap = new Map();
+
+  for (const user of users) {
     const fullName = user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.orgName || 'Organizer';
-    return {
+    participantMap.set(String(user._id), {
       id: String(user._id),
       modelType: 'User',
       name: fullName,
       avatar: user.avatar || null,
       role: 'admin',
-    };
+    });
   }
 
-  // Check Attendee collection
-  const attendee = await Attendee.findById(id).select('name');
-  if (attendee) {
-    return {
-      id: String(attendee._id),
-      modelType: 'Attendee',
-      name: attendee.name,
-      avatar: null,
-      role: 'attendee',
-    };
+  // Find remaining IDs that were not users (Attendees)
+  const remainingObjectIds = objectIds.filter(id => !participantMap.has(String(id)));
+  if (remainingObjectIds.length > 0) {
+    const attendees = await Attendee.find({ _id: { $in: remainingObjectIds } }).select('name');
+    for (const att of attendees) {
+      participantMap.set(String(att._id), {
+        id: String(att._id),
+        modelType: 'Attendee',
+        name: att.name,
+        avatar: null,
+        role: 'attendee',
+      });
+    }
   }
 
-  return null;
+  return participantMap;
+}
+
+/**
+ * Helper to resolve participant profile info (User or Attendee)
+ */
+async function resolveParticipant(id) {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+  const map = await resolveParticipantsBatch([id]);
+  return map.get(String(id)) || null;
 }
 
 /**
@@ -181,14 +198,11 @@ exports.createRoom = async (req, res) => {
       }
     }
 
-    // Auto-resolve participant profiles if not passed or empty
+    // Auto-resolve participant profiles if not passed or empty (batch resolved)
     let resolvedParticipants = Array.isArray(participants) && participants.length > 0 ? participants : [];
     if (isDirect && resolvedParticipants.length < pIds.length) {
-      resolvedParticipants = [];
-      for (const id of pIds) {
-        const p = await resolveParticipant(id);
-        if (p) resolvedParticipants.push(p);
-      }
+      const pMap = await resolveParticipantsBatch(pIds);
+      resolvedParticipants = pIds.map(id => pMap.get(String(id))).filter(Boolean);
     }
 
     const room = new Room({
@@ -269,15 +283,31 @@ exports.getRooms = async (req, res) => {
       .populate('leadParticipant', 'firstName lastName avatar')
       .sort({ createdAt: -1 });
 
-    // Format room display info (for DMs, personalize recipient info for requester)
-    const formattedRooms = await Promise.all(rooms.map(async (room) => {
+    // Pre-collect all missing otherParticipant IDs across all rooms to resolve in a single batch
+    const idsToResolve = [];
+    if (requesterId) {
+      for (const room of rooms) {
+        if (room.isGroup === false) {
+          const hasOtherInParticipants = (room.participants || []).some(p => String(p.id) !== String(requesterId));
+          if (!hasOtherInParticipants && room.participantIds?.length) {
+            const otherId = room.participantIds.find(id => String(id) !== String(requesterId));
+            if (otherId) idsToResolve.push(otherId);
+          }
+        }
+      }
+    }
+
+    const resolvedMap = idsToResolve.length > 0 ? await resolveParticipantsBatch(idsToResolve) : new Map();
+
+    // Format room display info synchronously without N+1 queries
+    const formattedRooms = rooms.map((room) => {
       const roomObj = room.toObject();
       if (room.isGroup === false && requesterId) {
         let otherParticipant = (room.participants || []).find(p => String(p.id) !== String(requesterId));
         if (!otherParticipant && room.participantIds?.length) {
           const otherId = room.participantIds.find(id => String(id) !== String(requesterId));
           if (otherId) {
-            otherParticipant = await resolveParticipant(otherId);
+            otherParticipant = resolvedMap.get(String(otherId)) || null;
           }
         }
         if (otherParticipant) {
@@ -288,7 +318,7 @@ exports.getRooms = async (req, res) => {
         }
       }
       return roomObj;
-    }));
+    });
 
     res.json(formattedRooms);
   } catch (error) {

@@ -99,15 +99,19 @@ exports.getPublishedEvents = async (req, res) => {
       .skip(startIndex)
       .limit(limit);
     
-    // Check for expiration on-the-fly to ensure UI accuracy
+    // Check for expiration on-the-fly to ensure UI accuracy (batch update to avoid N+1 queries)
     const updatedEvents = [];
+    const expiredIds = [];
     for (const event of events) {
       if (isEventExpired(event)) {
         event.status = 'Completed';
-        await event.save();
+        expiredIds.push(event._id);
       } else {
         updatedEvents.push(event);
       }
+    }
+    if (expiredIds.length > 0) {
+      await Event.updateMany({ _id: { $in: expiredIds } }, { $set: { status: 'Completed' } });
     }
 
     res.json({
@@ -171,15 +175,19 @@ exports.getEventListing = async (req, res) => {
       .skip(startIndex)
       .limit(limit);
     
-    // Check for expiration on-the-fly
+    // Check for expiration on-the-fly (batch update to avoid N+1 queries)
     const updatedEvents = [];
+    const expiredIds = [];
     for (const event of events) {
       if (isEventExpired(event)) {
         event.status = 'Completed';
-        await event.save();
+        expiredIds.push(event._id);
       } else {
         updatedEvents.push(event);
       }
+    }
+    if (expiredIds.length > 0) {
+      await Event.updateMany({ _id: { $in: expiredIds } }, { $set: { status: 'Completed' } });
     }
 
     res.json({
