@@ -1,3 +1,5 @@
+const { buildWhatsAppTicketUrl } = require('./whatsappHelper');
+
 /**
  * Generates a premium HTML registration confirmation email
  * @param {Object} data - Event and Attendee details
@@ -15,7 +17,11 @@ const generateRegistrationEmail = ({ name, event, ticketType, orderId, qrCodeUrl
   const darkBg = '#101828';
   const lightBg = '#F9FAFB';
   const backendUrl = process.env.BACKEND_URL || 'https://eventeevapi.onrender.com';
-
+  const whatsappUrl = buildWhatsAppTicketUrl({
+    attendee: { _id: attendeeId, name, orderId },
+    event,
+    ticketType
+  });
 
   return `
 <!DOCTYPE html>
@@ -86,10 +92,11 @@ const generateRegistrationEmail = ({ name, event, ticketType, orderId, qrCodeUrl
         <p class="qr-text">Scan this QR code at the door for quick entry</p>
       </div>
       
-      <p style="text-align: center; margin-top: 20px;">
-        <a href="${backendUrl}/api/attendee/ticket/${attendeeId}/download" style="background-color: ${primaryColor}; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(255,107,0,0.2); margin-right: 10px;">Download Ticket as PDF</a>
-        <a href="${backendUrl}/api/event/${event._id}/ics" style="background-color: #ffffff; color: #101828; padding: 16px 32px; border: 2px solid #EAECF0; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block;">Add to Calendar</a>
-      </p>
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="${backendUrl}/api/attendee/ticket/${attendeeId}/download" style="background-color: ${primaryColor}; color: #ffffff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(255,107,0,0.2); margin: 6px;">Download PDF Ticket</a>
+        <a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer" style="background-color: #25D366; color: #ffffff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block; box-shadow: 0 4px 12px rgba(37,211,102,0.25); margin: 6px;">💬 Send to WhatsApp</a>
+        <a href="${backendUrl}/api/event/${event._id}/ics" style="background-color: #ffffff; color: #101828; padding: 14px 24px; border: 2px solid #EAECF0; border-radius: 8px; text-decoration: none; font-weight: 700; display: inline-block; margin: 6px;">Add to Calendar</a>
+      </div>
     </div>
 
     

@@ -198,6 +198,40 @@ router.post('/google-register', attendeeController.googleRegisterAttendee);
  */
 router.get('/ticket/:id/download', attendeeController.downloadTicketPDF);
 
+/**
+ * @openapi
+ * /api/attendee/ticket/{id}/whatsapp:
+ *   get:
+ *     tags: [Attendees]
+ *     summary: 1-Click WhatsApp Ticket Share (redirects or returns link)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: phone
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Optional recipient phone number in international format
+ *       - in: query
+ *         name: json
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: Set to true to return JSON with whatsappUrl instead of redirecting
+ *     responses:
+ *       302:
+ *         description: Redirects to WhatsApp with pre-filled ticket details
+ *       200:
+ *         description: Returns JSON with whatsappUrl
+ *       404:
+ *         description: Attendee or Event not found
+ */
+router.get('/ticket/:id/whatsapp', attendeeController.redirectToWhatsAppTicket);
+
 const attendeeAuth = require('../middleware/attendeeAuth');
 
 /**

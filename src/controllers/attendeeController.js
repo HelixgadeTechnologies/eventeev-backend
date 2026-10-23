@@ -12,7 +12,7 @@ const User = require('../models/User');
 const CalendarEvent = require('../models/CalendarEvent');
 const { addEventToGoogleCalendar } = require('../utils/googleCalendar');
 const jwt = require('jsonwebtoken');
-
+const { buildWhatsAppTicketUrl } = require('../utils/whatsappHelper');
 
 /**
  * Helper to verify Paystack payment
@@ -112,7 +112,13 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
   // 2. Prevent duplicate registrations for same email + event
   const existingRegistration = await Attendee.findOne({ eventId, email });
   if (existingRegistration && existingRegistration.status === 'verified') {
-    return { alreadyRegistered: true, attendee: existingRegistration };
+    const existingTicket = existingRegistration.ticketId ? await Ticket.findById(existingRegistration.ticketId) : null;
+    const whatsappShareUrl = buildWhatsAppTicketUrl({
+      attendee: existingRegistration,
+      event,
+      ticketType: existingTicket ? existingTicket.name : 'General Admission'
+    });
+    return { alreadyRegistered: true, attendee: existingRegistration, whatsappShareUrl };
   }
 
   // 3. Validate Ticket and Quantity
@@ -231,8 +237,14 @@ const coreRegister = async ({ eventId, name, email, ticketId, paymentReference, 
   } catch (emailErr) {
     console.error('[Core Register] Registration email sending error:', emailErr);
   }
+  // 9. Generate 1-Click WhatsApp Share Link
+  const whatsappShareUrl = buildWhatsAppTicketUrl({
+    attendee,
+    event,
+    ticketType: ticket ? ticket.name : 'General Admission'
+  });
 
-  return { success: true, attendee };
+  return { success: true, attendee, whatsappShareUrl };
 };
 
 /**
@@ -334,14 +346,14 @@ exports.registerAttendee = async (req, res) => {
         }
         const payload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
-        return res.status(200).json({ token, attendee: result.attendee });
+        return res.status(200).json({ token, attendee: result.attendee, whatsappShareUrl: result.whatsappShareUrl });
       }
       return res.status(400).json({ message: 'You have already registered for this event' });
     }
 
     const payload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.status(201).json({ token, attendee: result.attendee });
+    res.status(201).json({ token, attendee: result.attendee, whatsappShareUrl: result.whatsappShareUrl });
   } catch (error) {
     console.error('[Register Attendee] Error:', error);
     res.status(error.message === 'Event not found' ? 404 : 400).json({ message: error.message || 'Server Error' });
@@ -397,14 +409,14 @@ exports.googleRegisterAttendee = async (req, res) => {
       if (expectedAmount > 0 && paymentReference && paymentReference === result.attendee.paymentReference) {
         const tokenPayload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
         const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '30d' });
-        return res.status(200).json({ token, attendee: result.attendee });
+        return res.status(200).json({ token, attendee: result.attendee, whatsappShareUrl: result.whatsappShareUrl });
       }
       return res.status(400).json({ message: 'You have already registered for this event' });
     }
 
     const tokenPayload = { attendee: { id: result.attendee.id, email: result.attendee.email } };
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.status(201).json({ token, attendee: result.attendee });
+    res.status(201).json({ token, attendee: result.attendee, whatsappShareUrl: result.whatsappShareUrl });
   } catch (error) {
     console.error('[Google Register Attendee] Error:', error);
     res.status(error.message === 'Event not found' ? 404 : 400).json({ message: error.message || 'Invalid Google token' });
@@ -714,6 +726,47 @@ exports.downloadTicketPDF = async (req, res) => {
 };
 
 /**
+ * @desc    Get or redirect to 1-click WhatsApp share link for attendee's ticket
+ * @route   GET /api/attendee/ticket/:id/whatsapp
+ * @access  Public
+ */
+exports.redirectToWhatsAppTicket = async (req, res) => {
+  try {
+    const attendee = await Attendee.findById(req.params.id);
+    if (!attendee) {
+      return res.status(404).json({ message: 'Attendee not found' });
+    }
+
+    const event = await Event.findById(attendee.eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    let ticketType = 'General Admission';
+    if (attendee.ticketId) {
+      const ticket = await Ticket.findById(attendee.ticketId);
+      if (ticket) ticketType = ticket.name;
+    }
+
+    const whatsappUrl = buildWhatsAppTicketUrl({
+      attendee,
+      event,
+      ticketType,
+      customPhone: req.query.phone || ''
+    });
+
+    if (req.query.json === 'true' || (req.headers.accept && req.headers.accept.includes('application/json'))) {
+      return res.json({ success: true, whatsappUrl });
+    }
+
+    return res.redirect(whatsappUrl);
+  } catch (error) {
+    console.error('[Redirect WhatsApp Ticket] Error:', error);
+    res.status(500).json({ message: 'Error generating WhatsApp link' });
+  }
+};
+
+/**
  * @desc    Login attendee via Email + Order ID or Payment Reference
  * @route   POST /api/attendee/login
  * @access  Public
@@ -836,7 +889,13 @@ exports.getAttendeeMe = async (req, res) => {
       return res.status(404).json({ message: 'Attendee record not found' });
     }
 
-    res.json({ success: true, attendee });
+    const whatsappShareUrl = buildWhatsAppTicketUrl({
+      attendee,
+      event: attendee.eventId,
+      ticketType: attendee.ticketId ? attendee.ticketId.name : 'General Admission'
+    });
+
+    res.json({ success: true, attendee, whatsappShareUrl });
   } catch (error) {
     console.error('[Get Attendee Me] Error:', error);
     res.status(500).json({ message: 'Server Error' });
