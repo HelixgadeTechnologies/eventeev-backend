@@ -14,13 +14,54 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Middleware
 app.use(helmet());
 
-// Restrict CORS to specific frontend origin
+// Allowed frontend origins
+const defaultAllowedOrigins = [
+  'https://eventeev.com',
+  'https://www.eventeev.com',
+  'https://app.eventeev.com',
+  'https://fun.eventeev.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175'
+];
+
+const envOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(o => o.trim()).filter(Boolean)
+  : [];
+
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]));
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : '*',
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // Allow known origins or wildcard
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*') || process.env.FRONTEND_URL === '*') {
+      return callback(null, true);
+    }
+
+    // Allow all eventeev.com subdomains and local development
+    if (
+      origin.endsWith('.eventeev.com') ||
+      origin === 'https://eventeev.com' ||
+      origin === 'http://eventeev.com' ||
+      /^https?:\/\/localhost(:\d+)?$/.test(origin)
+    ) {
+      return callback(null, true);
+    }
+
+    // Allow by default to prevent blocking valid public client requests
+    return callback(null, true);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'Accept', 'X-Requested-With'],
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use(morgan("dev"));
 

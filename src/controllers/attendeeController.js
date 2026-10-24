@@ -732,14 +732,34 @@ exports.downloadTicketPDF = async (req, res) => {
  */
 exports.redirectToWhatsAppTicket = async (req, res) => {
   try {
-    const attendee = await Attendee.findById(req.params.id);
+    const { id } = req.params;
+    let attendee = null;
+
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      attendee = await Attendee.findById(id);
+    }
+
     if (!attendee) {
-      return res.status(404).json({ message: 'Attendee not found' });
+      attendee = await Attendee.findOne({
+        $or: [
+          { orderId: id },
+          { paymentReference: id }
+        ]
+      });
+    }
+
+    // Fallback: If caller passed ticket ID and optional phone/email
+    if (!attendee && mongoose.Types.ObjectId.isValid(id)) {
+      attendee = await Attendee.findOne({ ticketId: id }).sort({ registrationDate: -1 });
+    }
+
+    if (!attendee) {
+      return res.status(404).json({ success: false, message: 'Attendee ticket record not found' });
     }
 
     const event = await Event.findById(attendee.eventId);
     if (!event) {
-      return res.status(404).json({ message: 'Event not found' });
+      return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
     let ticketType = 'General Admission';
@@ -755,14 +775,28 @@ exports.redirectToWhatsAppTicket = async (req, res) => {
       customPhone: req.query.phone || ''
     });
 
-    if (req.query.json === 'true' || (req.headers.accept && req.headers.accept.includes('application/json'))) {
-      return res.json({ success: true, whatsappUrl });
+    // Detect if caller is fetch/AJAX (which must NOT receive a 302 redirect to wa.me due to CORS)
+    const isCorsFetch = req.headers['sec-fetch-mode'] === 'cors' || 
+                        req.headers['sec-fetch-dest'] === 'empty' ||
+                        req.headers['x-requested-with'] === 'XMLHttpRequest';
+    const wantsJson = req.query.json === 'true' || 
+                      Boolean(req.query.phone) ||
+                      (req.headers.accept && req.headers.accept.includes('application/json')) ||
+                      isCorsFetch;
+
+    if (wantsJson) {
+      return res.json({ 
+        success: true, 
+        whatsappUrl,
+        message: 'WhatsApp ticket link generated successfully'
+      });
     }
 
+    // Direct browser navigation redirect
     return res.redirect(whatsappUrl);
   } catch (error) {
     console.error('[Redirect WhatsApp Ticket] Error:', error);
-    res.status(500).json({ message: 'Error generating WhatsApp link' });
+    res.status(500).json({ success: false, message: 'Error generating WhatsApp link' });
   }
 };
 
